@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ドラム・ライブビジュアライザー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage:#000; --panel:#15171e; --panel2:#1d2029; --line:#2c303c; --ink:#eceef4; --mute:#9096a8;
+  --kick:#ff3b30; --snare:#3d8bff; --hihat:#ffffff; --htom:#2ee87a; --ltom:#ffe11a; --ftom:#a35bff; --crash:#ffb31a; --ride:#5fd8ff;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--stage);color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+  display:grid;grid-template-rows:1fr auto;overflow:hidden;
+  padding-top:env(safe-area-inset-top,0px);
+}
+#stage{position:relative;min-height:0;overflow:hidden;background:#000}
+#cv{position:relative;z-index:1;width:100%;height:100%;object-fit:contain;display:block}
+.srcvid{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0;pointer-events:none}
+
+/* 開始画面 */
+#intro{position:absolute;inset:0;z-index:3;display:flex;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px;background:radial-gradient(ellipse at 50% 120%,#1a1030 0%,#000 60%)}
+#intro .box{max-width:34rem;margin:auto}
+#intro h1{font-size:clamp(1.8rem,4.5vw,3rem);line-height:1.25;margin:0 0 .6em;font-weight:700;letter-spacing:.02em}
+#intro p{color:var(--mute);line-height:1.8;margin:0 0 1.4em}
+.legend{display:grid;grid-template-columns:repeat(2,auto);gap:.5em 1.4em;margin:1.8em 0 0;color:var(--ink);font-size:.95rem;justify-content:start}
+.legend span::before{content:"";display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:.45em;background:var(--c);vertical-align:-.02em}
+.actions{display:flex;flex-wrap:wrap;gap:12px}
+.hint{font-size:.85rem;color:var(--mute);margin-top:1.4em}
+kbd{font-family:inherit;border:1px solid var(--line);border-radius:4px;padding:0 .35em;font-size:.85em;background:var(--panel2)}
+
+button,.btn,select{font:inherit;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:.5em;border:1px solid var(--line);background:var(--panel2);padding:.6em 1.1em;border-radius:999px;cursor:pointer}
+.btn.primary{background:var(--ink);color:#000;border-color:var(--ink);font-weight:700}
+.btn:hover{border-color:var(--mute)}
+.btn:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--snare);outline-offset:2px}
+
+/* 叩いた音が光るストリップ */
+.strip{display:grid;grid-template-columns:repeat(8,1fr);height:7px;background:#000}
+.strip span{background:var(--c);opacity:.14;transition:opacity .3s}
+.strip span.on{opacity:1;transition:none}
+
+.bar{background:var(--panel);border-top:1px solid var(--line)}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:.55em 1.05em;cursor:pointer;color:var(--mute)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#000;font-weight:700}
+.rec .dot{width:.75em;height:.75em;border-radius:50%;background:var(--kick)}
+.rec.on{border-color:var(--kick);color:#fff;background:#3a0f0d}
+.rec.on .dot{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+.spacer{flex:1}
+.status{color:var(--mute);font-size:.85rem}
+
+/* 調整パネル */
+#tune{position:absolute;z-index:4;top:0;right:0;bottom:0;width:min(370px,94vw);background:rgba(21,23,30,.96);border-left:1px solid var(--line);padding:18px 18px 24px;overflow:auto;transform:translateX(100%);transition:transform .2s}
+#tune.open{transform:none}
+#tune h2{font-size:1.15rem;margin:0 0 .3em}
+#tune .note{color:var(--mute);font-size:.85rem;line-height:1.7;margin:0 0 1.2em}
+#tune label.f{display:block;font-size:.85rem;color:var(--mute);margin:.9em 0 .3em}
+#tune select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.45em .6em}
+.lvl{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:.4em}
+.lvl i{display:block;height:100%;width:0;background:var(--htom)}
+.lvl.clip i{background:var(--kick)}
+.drum{display:grid;grid-template-columns:14px 1fr auto;gap:6px 10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.drum:first-of-type{margin-top:1.2em}
+.drum .lamp{width:14px;height:14px;border-radius:50%;background:var(--c);opacity:.2}
+.drum .lamp.on{opacity:1;box-shadow:0 0 12px var(--c)}
+.drum .nm{font-weight:700}
+.drum .k{color:var(--mute);font-size:.8rem}
+.drum .meter{grid-column:2/4;position:relative;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.drum .meter i{position:absolute;inset:0;background:var(--c);transform-origin:left;transform:scaleX(0);opacity:.85}
+.drum .meter::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.drum input{grid-column:2/4;width:100%;accent-color:var(--c)}
+
+#hud{position:absolute;z-index:2;left:14px;top:12px;font-size:.85rem;color:rgba(255,255,255,.75);pointer-events:none;text-shadow:0 1px 3px #000}
+#flash{position:absolute;z-index:2;left:50%;top:40%;transform:translate(-50%,-50%);font-size:clamp(2rem,7vw,4.5rem);font-weight:700;pointer-events:none;opacity:0;text-shadow:0 2px 20px rgba(0,0,0,.6)}
+#flash.show{animation:gname 1.1s ease-out}
+@keyframes gname{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
+#msg{position:absolute;z-index:6;left:50%;bottom:16px;transform:translateX(-50%);background:#2a1214;border:1px solid var(--kick);padding:.7em 1em;border-radius:10px;max-width:90%;line-height:1.6;display:none}
+#msg.show{display:block}
+#dlg{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:20px;z-index:5}
+#dlg[hidden]{display:none}
+#dlg .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;max-width:30rem;width:100%}
+#dlg h3{margin:0 0 .5em;font-size:1.15rem}
+#dlg p{margin:0 0 1.2em;color:var(--mute);line-height:1.7;white-space:pre-line}
+.prog{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-bottom:1.2em}
+.prog i{display:block;height:100%;width:0;background:var(--snare);transition:width .3s}
+.drum button.nm{background:none;border:0;padding:0;text-align:left;cursor:pointer;font-weight:700;justify-self:start}
+#stage.drop::after{content:"ここに動画をドロップ";position:absolute;inset:12px;z-index:7;display:grid;place-items:center;border:3px dashed var(--ride);border-radius:16px;background:rgba(0,0,0,.6);font-size:1.4rem;font-weight:700;pointer-events:none}
+@media (prefers-reduced-motion:reduce){#flash.show{animation:none}#tune{transition:none}}
+@media (max-height:640px),(max-width:640px){#intro{padding:16px}#intro h1{font-size:1.6rem;margin-bottom:.4em}#intro p{margin-bottom:1em}.legend{font-size:.85rem;gap:.35em 1em;margin-top:1.2em}.hint{margin-top:1em}}
+@media (max-width:640px){.legend{grid-template-columns:auto}.status{display:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="1280" height="720" aria-label="カメラ映像とエフェクト"></canvas>
+  <div id="hud"></div>
+  <div id="flash"></div>
+
+  <div id="intro">
+    <div class="box">
+      <h1>叩いた瞬間、<br>画面が光る。</h1>
+      <p>マイクでドラムの音を聞き分けて、カメラ映像にエフェクトをその場で重ねます。そのまま録画もできます。</p>
+      <div class="actions">
+        <button class="btn primary" id="goLive">カメラとマイクで始める</button>
+        <button class="btn" id="goFile">演奏動画ファイルで試す</button>
+        <input type="file" id="fileIn" accept="video/*" hidden>
+      </div>
+      <p class="hint" id="hint">ドラムがなくても、キーボードの <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd> で各エフェクトを試せます。<br>演奏動画は、写真アプリやFinderからこの画面にドラッグしても読み込めます。</p>
+      <div class="legend">
+        <span style="--c:var(--kick)">バスドラム(キック) 赤い衝撃波</span>
+        <span style="--c:var(--snare)">スネア 青い波紋</span>
+        <span style="--c:var(--hihat)">ハイハット 白い粒子</span>
+        <span style="--c:var(--htom)">ハイタム 緑の流線</span>
+        <span style="--c:var(--ltom)">ロータム 黄色の軌跡</span>
+        <span style="--c:var(--ftom)">フロアタム 紫の振動波</span>
+        <span style="--c:var(--crash)">クラッシュシンバル 金色の閃光</span>
+        <span style="--c:var(--ride)">ライドシンバル 水色のリング</span>
+      </div>
+    </div>
+  </div>
+
+  <aside id="tune" aria-label="調整">
+    <h2>調整</h2>
+    <p class="note">叩くと各メーターが伸びます。中央の線を越えると反応します。反応しない音は感度を上げ、ほかの音につられて光る音は感度を下げてください。</p>
+    <label class="f" for="camSel">カメラ</label>
+    <select id="camSel"></select>
+    <label class="f" for="micSel">マイク</label>
+    <select id="micSel"></select>
+    <label class="f">入力レベル(赤くなったら音が割れています)</label>
+    <div class="lvl" id="lvl"><i></i></div>
+    <div id="drums"></div>
+    <label class="f" for="gateIn">まわりの音を無視する強さ</label>
+    <input type="range" id="gateIn" min="6" max="30" value="14" style="width:100%">
+    <p class="note" style="margin-top:.4em">叩いていないのに光るときは右へ動かしてください。</p>
+    <p style="margin-top:1.2em;display:flex;flex-wrap:wrap;gap:10px"><button class="btn" id="recal">環境音を測り直す</button><button class="btn" id="reset">初期値に戻す</button></p>
+  </aside>
+  <div id="msg" role="alert"></div>
+  <div id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="card"><h3 id="dlgT"></h3><p id="dlgP"></p><div class="prog" id="dlgProg" hidden><i></i></div><div class="actions" id="dlgA"></div></div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="strip" id="strip"></div>
+  <div class="controls">
+    <button class="btn" id="homeBtn" disabled>最初の画面へ</button>
+    <div class="seg" role="group" aria-label="ジャンル">
+      <button data-g="pop">ポップス</button>
+      <button data-g="rock">ロック</button>
+      <button data-g="fusion">フュージョン</button>
+    </div>
+    <button class="btn rec" id="recBtn" disabled><span class="dot"></span><span id="recTxt">録画</span></button>
+    <button class="btn" id="flipBtn" disabled>カメラ切替</button>
+    <button class="btn" id="mirBtn" aria-pressed="true">左右反転</button>
+    <span class="spacer"></span>
+    <span class="status" id="status">未接続</span>
+    <button class="btn" id="tuneBtn" aria-expanded="false" aria-controls="tune">調整</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const PI2 = Math.PI * 2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- ドラムの定義:帯域(Hz)・基準しきい値(dB)・連打の最短間隔(ms)・画面上の位置 ----
+const DRUMS = [
+  { id:'kick',  name:'バスドラム', color:'#ff3b30', thr:9,  refr:90,  pos:[.50,.82], key:'a' },
+  { id:'snare', name:'スネア',     color:'#3d8bff', thr:9,  refr:70,  pos:[.36,.58], key:'s' },
+  { id:'hihat', name:'ハイハット', color:'#ffffff', thr:8,  refr:60,  pos:[.16,.42], key:'d' },
+  { id:'htom',  name:'ハイタム',   color:'#2ee87a', thr:9,  refr:80,  pos:[.42,.36], key:'f' },
+  { id:'ltom',  name:'ロータム',   color:'#ffe11a', thr:9,  refr:80,  pos:[.58,.36], key:'g' },
+  { id:'ftom',  name:'フロアタム', color:'#a35bff', thr:9,  refr:90,  pos:[.74,.66], key:'h' },
+  { id:'crash', name:'クラッシュ', color:'#ffb31a', thr:12, refr:250, pos:[.20,.18], key:'j' },
+  { id:'ride',  name:'ライド',     color:'#5fd8ff', thr:9,  refr:120, pos:[.84,.30], key:'k' },
+];
+const DMAP = Object.fromEntries(DRUMS.map(d => [d.id, d]));
+const GNAME = { pop:'ポップス', rock:'ロック', fusion:'フュージョン' };
+const NOTE = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+// ---- 状態 ----
+let ac = null, analyser = null, fbuf = null, tbuf = null, recDest = null, srcNode = null;
+let stream = null, video = null, mode = null, loopOn = false;
+let genre = 'pop', mirror = true, shake = 0;
+let rec = null, recChunks = [], recStart = 0, recPeak = 0;
+const fx = [], ps = [];
+const st = {};
+DRUMS.forEach(d => st[d.id] = { E:-120, hist:[], ring:new Float32Array(300), ri:0, rn:0, floor:-90, calFloor:null, last:0, rise:0, above:0, lamp:0, armed:true, peak:-120 });
+let gateDb = 14, calibUntil = 0, calPending = false, inputNode = null, frameNo = 0;
+const bandAn = {}, bandBuf = {};
+let pitch = { f:110, pc:9, n:6, name:'A2', on:false }, loud = 0;
+const sens = {};
+DRUMS.forEach(d => sens[d.id] = 50);
+
+// 設定の保存(使えない環境では無視)
+try {
+  const s = JSON.parse(localStorage.getItem('drumviz') || '{}');
+  if (s.sens) Object.assign(sens, s.sens);
+  if (s.gate) gateDb = s.gate;
+  if (s.genre in GNAME) genre = s.genre;
+} catch (e) {}
+function save() { try { localStorage.setItem('drumviz', JSON.stringify({ sens, genre, gate:gateDb })); } catch (e) {} }
+
+// ---- UI 構築 ----
+const strip = {}, rows = {};
+DRUMS.forEach(d => {
+  const s = document.createElement('span'); s.style.setProperty('--c', d.color); s.title = d.name;
+  $('#strip').appendChild(s); strip[d.id] = s;
+  const r = document.createElement('div'); r.className = 'drum'; r.style.setProperty('--c', d.color);
+  r.innerHTML = `<span class="lamp"></span><button class="nm" type="button">${d.name}</button><span class="k">キー ${d.key.toUpperCase()}</span>
+    <div class="meter"><i></i></div>
+    <input type="range" min="0" max="100" value="${sens[d.id]}" aria-label="${d.name}の感度">`;
+  $('#drums').appendChild(r);
+  const inp = r.querySelector('input');
+  inp.addEventListener('input', () => { sens[d.id] = +inp.value; save(); });
+  r.querySelector('.nm').onclick = () => { ensureLoop(); trigger(d.id, 1); };
+  rows[d.id] = { lamp:r.querySelector('.lamp'), bar:r.querySelector('.meter i'), inp };
+});
+$('#reset').onclick = () => { DRUMS.forEach(d => { sens[d.id] = 50; rows[d.id].inp.value = 50; }); gateDb = 14; $('#gateIn').value = 14; save(); };
+$('#gateIn').value = gateDb;
+$('#gateIn').addEventListener('input', () => { gateDb = +$('#gateIn').value; save(); });
+$('#recal').onclick = () => startCalib();
+
+function setGenre(g, announce) {
+  genre = g; save();
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === g));
+  if (announce && !reduceMotion) {
+    const el = $('#flash'); el.textContent = GNAME[g]; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+}
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setGenre(b.dataset.g, true));
+setGenre(genre, false);
+
+$('#mirBtn').onclick = () => { mirror = !mirror; $('#mirBtn').setAttribute('aria-pressed', mirror); };
+$('#tuneBtn').onclick = () => {
+  const open = $('#tune').classList.toggle('open');
+  $('#tuneBtn').setAttribute('aria-expanded', open);
+};
+$('#homeBtn').onclick = () => goHome();
+$('#recBtn').onclick = () => { if (ac && ac.state !== 'running') ac.resume(); rec ? stopRec() : startRec(); };
+$('#goLive').onclick = () => startLive();
+$('#goFile').onclick = () => { ensureAudio(); $('#fileIn').click(); };
+$('#flipBtn').onclick = () => {
+  const sel = $('#camSel');
+  if (sel.options.length < 2) { showMsg('切り替えられるカメラがありません。'); return; }
+  sel.selectedIndex = (sel.selectedIndex + 1) % sel.options.length;
+  startLive();
+};
+if (matchMedia('(pointer: coarse)').matches)
+  $('#hint').textContent = 'ドラムがなくても、「調整」パネルのドラム名をタップすると各エフェクトを試せます。';
+
+// ---- 動画のドラッグ&ドロップ(Macの写真アプリ・Finderから)----
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; $('#stage').classList.add('drop'); } });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#stage').classList.remove('drop'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; $('#stage').classList.remove('drop');
+  const files = [...(e.dataTransfer ? e.dataTransfer.files : [])];
+  const f = files.find(f => /^video\//.test(f.type) || /\.(mov|mp4|m4v|webm|avi|mkv)$/i.test(f.name));
+  if (f) { ensureAudio(); startFile(f); }
+  else if (files.length) showMsg('動画ファイルをドロップしてください。');
+  else dialog('動画を受け取れませんでした',
+    '写真アプリから直接ドラッグした動画は、ブラウザに渡されないことがあります。\n' +
+    '写真アプリで動画を選び、「ファイル」→「書き出す」→「1本のビデオを書き出す」でデスクトップなどに保存してから、そのファイルをこの画面にドラッグしてください。',
+    [{ label:'閉じる', primary:true }]);
+});
+
+// ---- ダイアログ ----
+function dialog(title, text, buttons) {
+  $('#dlgT').textContent = title; $('#dlgP').textContent = text; $('#dlgProg').hidden = true;
+  const A = $('#dlgA'); A.innerHTML = '';
+  for (const b of buttons) {
+    const el = document.createElement('button'); el.className = 'btn' + (b.primary ? ' primary' : ''); el.textContent = b.label;
+    el.onclick = () => { if (!b.keep) closeDlg(); if (b.onClick) b.onClick(); };
+    A.appendChild(el);
+  }
+  $('#dlg').hidden = false;
+  const first = A.querySelector('button'); if (first) first.focus();
+}
+function closeDlg() { $('#dlg').hidden = true; }
+function setProg(r) { $('#dlgProg').hidden = false; $('#dlgProg i').style.width = clamp(r, 0, 1) * 100 + '%'; }
+
+// ---- 画面が消えないようにする(録画中のiPhone/iPad向け)と、復帰時の音声再開 ----
+let wakeLock = null;
+async function keepAwake() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); } } catch (e) {} }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { if (mode) keepAwake(); if (ac && ac.state !== 'running') ac.resume().catch(() => {}); }
+});
+document.addEventListener('pointerdown', () => { if (ac && ac.state !== 'running') ac.resume().catch(() => {}); }, true);
+$('#fileIn').onchange = e => { const f = e.target.files[0]; if (f) startFile(f); e.target.value = ''; };
+$('#camSel').onchange = () => { if (mode === 'live') startLive(); };
+$('#micSel').onchange = () => { if (mode === 'live') startLive(); };
+$('#stage').addEventListener('click', e => {
+  if (mode === 'file' && e.target === cv && video) video.paused ? video.play() : video.pause();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.repeat) return;
+  const k = e.key.toLowerCase();
+  const d = DRUMS.find(d => d.key === k);
+  if (d) { ensureLoop(); trigger(d.id, 1); return; }
+  if (k === '1') setGenre('pop', true);
+  if (k === '2') setGenre('rock', true);
+  if (k === '3') setGenre('fusion', true);
+  if (k === 'r' && !$('#recBtn').disabled) $('#recBtn').click();
+});
+
+function showMsg(t) { const m = $('#msg'); m.textContent = t; m.classList.add('show'); clearTimeout(showMsg.t); showMsg.t = setTimeout(() => m.classList.remove('show'), 7000); }
+
+// ---- 入力 ----
+async function ensureAudio() {
+  if (!ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 2048;              // 48kHz で約23Hz刻み。キックの低域を分けるため
+    analyser.smoothingTimeConstant = 0;   // アタックを鈍らせない
+    analyser.minDecibels = -120; analyser.maxDecibels = 0;
+    fbuf = new Float32Array(analyser.frequencyBinCount);
+    tbuf = new Float32Array(analyser.fftSize);
+    recDest = ac.createMediaStreamDestination();
+    inputNode = ac.createGain();
+    inputNode.connect(analyser);
+    buildBands();
+  }
+  if (ac.state === 'suspended') await ac.resume();
+}
+
+function stopSource() {
+  if (rec) stopRec();
+  if (srcNode) { try { if (srcNode.stop) srcNode.stop(); } catch (e) {} try { srcNode.disconnect(); } catch (e) {} srcNode = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (video) { video.pause(); if (video.src && video.src.startsWith('blob:')) URL.revokeObjectURL(video.src); video.remove(); video = null; }
+}
+
+function sizeCanvas() {
+  let w = video.videoWidth || 1280, h = video.videoHeight || 720;
+  if (w > 1920) { h = Math.round(h * 1920 / w); w = 1920; }
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+}
+
+async function startLive() {
+  const isSafari = /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
+  const fileHint = 'このページではカメラとマイクを使えません。Safariを最新版にするか、https で始まるアドレスに置いて開いてください。';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMsg(location.protocol === 'file:' && isSafari ? fileHint : 'このブラウザではカメラを使えません。Chrome か Edge で開いてください。'); return;
+  }
+  try {
+    await ensureAudio();
+    stopSource();
+    const camId = $('#camSel').value, micId = $('#micSel').value;
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: Object.assign({ width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} }, camId ? { deviceId:{ exact:camId } } : { facingMode:'user' }),
+      // ドラムの音を加工させない(自動音量・ノイズ除去はアタックを潰すため切る)
+      audio: Object.assign({ echoCancellation:false, noiseSuppression:false, autoGainControl:false }, micId ? { deviceId:{ exact:micId } } : {}),
+    });
+    video = makeVideo();
+    video.muted = true; video.autoplay = true; video.srcObject = stream;
+    video.addEventListener('resize', sizeCanvas);
+    await video.play();
+    sizeCanvas();
+    if (ac.state !== 'running') await ac.resume().catch(() => {});
+    srcNode = ac.createMediaStreamSource(stream);
+    srcNode.connect(inputNode); srcNode.connect(recDest);   // スピーカーには出さない(ハウリング防止)
+    const fm = (stream.getVideoTracks()[0].getSettings() || {}).facingMode;   // 前面カメラのときだけ鏡像にする
+    mode = 'live'; mirror = fm ? fm === 'user' : true; $('#mirBtn').setAttribute('aria-pressed', mirror);
+    await listDevices();
+    $('#flipBtn').disabled = false;
+    onStarted('カメラ・マイク');
+  } catch (e) {
+    const n = e && e.name;
+    if (n === 'NotAllowedError' && window.claude && window.claude.use) showMsg('claude.ai のページでは、カメラとマイクが使えない場合があります。ダウンロードしたファイル(Mac)か、Netlifyなどに置いたアプリ(iPhone・iPad)を使ってください。');
+    else if (n === 'NotAllowedError') showMsg('カメラかマイクの使用が許可されていません。もう一度「カメラとマイクで始める」を押し、確認が出たら「許可」を選んでください。');
+    else if (n === 'NotFoundError' || n === 'OverconstrainedError') showMsg('カメラかマイクが見つかりません。接続を確かめるか、調整パネルで別の機器を選んでください。');
+    else if (n === 'NotReadableError') showMsg('カメラかマイクがほかのアプリで使用中です。ほかのアプリを閉じてから試してください。');
+    else showMsg('開始できませんでした:' + (e && e.message ? e.message : e));
+  }
+}
+
+// iOSでは画面上に置かないと映像が更新されないことがあるため、見えない形で配置する
+function makeVideo() {
+  const v = document.createElement('video');
+  v.playsInline = true; v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+  v.className = 'srcvid'; $('#stage').insertBefore(v, cv);
+  return v;
+}
+
+// ブラウザがそのまま再生できるか試す(MOV/HEVCはSafari・Mac・対応GPUのWindowsなら通る)
+// 動画を選んだら、すぐにエフェクト画面へつなぎ、「再生してスタート」で再生する。
+// 事前の読み込み確認はしない(ブラウザが本当にエラーを出したときだけ案内する)
+// 楽譜モグラと同じ流れ:選んだらすぐつなぎ、「再生してスタート」のタップで再生する。
+// ダブルクリックで開いたページ(file://)では、Safariが動画の受け渡し(blob)を拒むことがあるため、
+// そのときはファイルの中身を直接埋め込む方法(data URL)で読み直す。
+async function startFile(file, converted) {
+  await ensureAudio();
+  stopSource();
+  const v = makeVideo(); v.loop = true; v.preload = 'auto';
+  let triedInline = false, failedOnce = false;
+
+  const showReady = () => {
+    const btns = [{ label:'再生してスタート', primary:true, onClick:() => {
+      if (ac.state !== 'running') ac.resume();
+      const p = v.play();
+      if (p && p.catch) p.catch(err => { if (err && err.name !== 'AbortError') fail(`${err.name}: ${err.message}`); });
+    } }];
+    if (converted) btns.push({ label:'変換した動画を保存', keep:true, onClick:() => downloadFile(file) });
+    dialog(converted ? '変換できました' : '動画を選びました', file.name +
+      (converted ? '\n変換した動画を保存しておくと、次からは変換なしで使えます。' : ''), btns);
+  };
+
+  const fail = why => {
+    if (video !== v || failedOnce) return;
+    if (!triedInline && location.protocol === 'file:' && file.size < 700 * 1048576) {
+      triedInline = true;
+      dialog('動画を読み込んでいます', file.name, []);
+      const fr = new FileReader();
+      fr.onload = () => { if (video !== v) return; v.src = fr.result; v.load(); v.addEventListener('loadedmetadata', showReady, { once:true }); };
+      fr.onerror = () => { triedInline = true; fail(why); };
+      fr.readAsDataURL(file);
+      return;
+    }
+    failedOnce = true;
+    stopSource();
+    fileFailed(file, why, true);
+  };
+
+  v.addEventListener('error', () => {
+    const c = v.error ? v.error.code : 0;
+    fail(c === 4 ? 'このブラウザが対応していない形式です(コード4)'
+       : c === 3 ? '映像または音声の形式を読み取れませんでした(コード3)'
+       : `読み込み中にエラーが起きました(コード${c || '不明'})`);
+  });
+  v.src = URL.createObjectURL(file);
+  attachFile(v, file, true);
+  showReady();
+}
+
+// 読み込めた動画をエフェクト画面につなぐ
+function attachFile(v, file, alreadyPlaying) {
+  video = v; sizeCanvas(); v.addEventListener('resize', sizeCanvas); v.addEventListener('loadedmetadata', sizeCanvas);
+  srcNode = ac.createMediaElementSource(v);
+  srcNode.connect(inputNode); srcNode.connect(recDest); srcNode.connect(ac.destination);
+  mode = 'file'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false);
+  $('#flipBtn').disabled = true;
+  onStarted('動画ファイル(画面クリックで一時停止)');
+  if (!alreadyPlaying) {
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {   // iPhone/iPadは音付き動画の自動再生を止めるので、タップで再生してもらう
+      dialog('動画を再生します', '下のボタンを押すと再生が始まります。', [{ label:'再生', primary:true, onClick:() => { ac.resume(); v.play(); } }]);
+    });
+  }
+  // 再生が進んでいるのに映像の大きさが0のまま=映像の形式に非対応(音だけ再生されている)
+  setTimeout(function check() {
+    if (video !== v) return;
+    if (v.paused || v.currentTime < 1) { setTimeout(check, 1000); return; }
+    if (!v.videoWidth && file) { stopSource(); fileFailed(file, '映像が読み取れませんでした(音声のみ)'); }
+  }, 1500);
+}
+
+// タップした瞬間に、変換せずそのまま再生する(ブラウザの自動再生の制限を受けない方法)
+function playDirect(file) {
+  stopSource();
+  if (ac.state !== 'running') ac.resume();
+  const v = makeVideo(); v.loop = true;
+  v.src = URL.createObjectURL(file);
+  const p = v.play();
+  const failed = err => {
+    v.remove();
+    const c = v.error ? `(コード${v.error.code})` : '';
+    fileFailed(file, (err && err.name ? `${err.name}: ${err.message}` : 'そのまま再生できませんでした') + c, true);
+  };
+  if (p && p.then) p.then(() => attachFile(v, file, true)).catch(failed);
+  else v.addEventListener('playing', () => attachFile(v, file, true), { once:true });
+}
+
+function envInfo() {
+  const ua = navigator.userAgent;
+  const br = /Edg\//.test(ua) ? 'Edge' : /(Chrome|CriOS)\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'その他のブラウザ';
+  const os = /iPhone/.test(ua) ? 'iPhone' : (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) ? 'iPad'
+           : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'その他の端末';
+  const h264 = document.createElement('video').canPlayType('video/mp4; codecs="avc1.640028"');
+  return `環境:${os} / ${br}(H.264:${h264 ? '対応' : '非対応'})`;
+}
+
+// そのまま再生できなかったとき:理由を見せ、「もう一度そのまま再生」と「変換して再生」を選んでもらう
+function fileFailed(file, why, afterRetry) {
+  const inClaude = !!(window.claude && window.claude.use);   // claude.ai上では変換ツールを読み込めない
+  dialog('この動画の映像を再生できませんでした',
+    `「${file.name}」\n理由:${why || '不明'}\n${envInfo()}\n\n` +
+    'このブラウザが、この動画の映像形式(HEVCなど)を読めません。次のどれかを選んでください。\n' +
+    '・「音だけで再生」:楽譜モグラと同じく、音声だけでエフェクトを出します(映像は黒い画面)。\n' +
+    '・映像も使いたい場合:MacのQuickTime Playerで動画を開き、「ファイル」→「書き出す」→「1080p」で、フォーマットに「互換性を優先(H.264)」を選んで保存し、そのファイルを読み込んでください。' +
+    (inClaude ? '' : '\n・「変換して再生」:このアプリの中で変換します(時間がかかります)。'),
+    [
+      { label:'音だけで再生', primary:true, onClick:() => playAudioOnly(file) },
+      ...(afterRetry ? [] : [{ label:'もう一度そのまま再生', onClick:() => playDirect(file) }]),
+      ...(inClaude ? [] : [{ label:'変換して再生', onClick:() => convertAndPlay(file, why) }]),
+      { label:'やめる' },
+    ]);
+}
+
+// 楽譜モグラと同じ方式:映像を読めない動画から音声だけを取り出して再生する
+async function playAudioOnly(file) {
+  stopSource();
+  await ensureAudio();
+  if (ac.state !== 'running') ac.resume();
+  dialog('音声を読み込んでいます', file.name, []);
+  try {
+    const data = await file.arrayBuffer();
+    const buf = await new Promise((res, rej) => {
+      const p = ac.decodeAudioData(data, res, rej);
+      if (p && p.then) p.then(res, rej);
+    });
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    src.connect(inputNode); src.connect(recDest); src.connect(ac.destination);
+    srcNode = src; video = null;
+    mode = 'file'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false); $('#flipBtn').disabled = true;
+    closeDlg();
+    onStarted('音声のみ(映像を読めない形式のため)');
+    src.start();
+  } catch (e) {
+    dialog('音声も読み込めませんでした', `「${file.name}」\nQuickTime PlayerでH.264形式に書き出してから読み込んでください。`, [{ label:'閉じる', primary:true }]);
+  }
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res;
+    s.onerror = () => rej(new Error('変換ツールを読み込めませんでした。インターネットに接続した状態で試してください。'));
+    document.head.appendChild(s);
+  });
+}
+
+let ffmpeg = null;
+async function convertAndPlay(file, why) {
+  dialog('再生できる形式に変換しています',
+    `「${file.name}」はこのブラウザでそのまま再生できない形式のため、MP4に変換してから再生します。\n` +
+    (why ? `(理由:${why})\n` : '') +
+    '動画の長さの数倍の時間がかかります。画面が止まったように見えても処理は続いているので、この画面のまま待ってください。' +
+    (file.size > 400 * 1048576 ? '\nファイルが大きいため、途中で失敗することがあります。' : ''), []);
+  setProg(.02);
+  await new Promise(r => setTimeout(r, 80));   // 表示を先に描かせる
+  try {
+    if (!window.FFmpeg) await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js');
+    if (!ffmpeg) ffmpeg = FFmpeg.createFFmpeg({ log:false, mainName:'main', corePath:'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js' });
+    if (!ffmpeg.isLoaded()) await ffmpeg.load();
+    ffmpeg.setProgress(({ ratio }) => setProg(Math.max(.05, ratio)));
+    const ext = (file.name.split('.').pop() || 'mov').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mov';
+    const inName = 'in.' + ext;
+    ffmpeg.FS('writeFile', inName, await FFmpeg.fetchFile(file));
+    setProg(.05);
+    await new Promise(r => setTimeout(r, 50));
+    await ffmpeg.run('-i', inName,
+      '-vf', 'scale=w=min(iw\\,1280):h=min(ih\\,1280):force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', 'out.mp4');
+    const data = ffmpeg.FS('readFile', 'out.mp4');
+    try { ffmpeg.FS('unlink', inName); ffmpeg.FS('unlink', 'out.mp4'); } catch (e) {}
+    const conv = new File([data.buffer], file.name.replace(/\.[^.]+$/, '') + '_h264.mp4', { type:'video/mp4' });
+    closeDlg();
+    await startFile(conv, true);
+  } catch (e) {
+    dialog('変換できませんでした', (e && e.message ? e.message : String(e)) +
+      '\nパソコンのアプリ(HandBrake など)でMP4(H.264)に変換してから読み込んでください。', [{ label:'閉じる' }]);
+  }
+}
+
+let dlNs = null;
+try { if (window.claude && window.claude.use) window.claude.use('downloads').then(n => { dlNs = n; }).catch(() => {}); } catch (e) {}
+function downloadFile(file) {
+  if (dlNs) {
+    dlNs.save({ filename:file.name, data:file }).catch(e => {
+      if (e && e.code !== 'declined' && e.code !== 'rate_limited') showMsg('保存できませんでした(' + (e.code || e.message || e) + ')');
+    });
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+async function listDevices() {
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind, track) => {
+    const cur = track ? (track.getSettings().deviceId || '') : sel.value;
+    sel.innerHTML = '';
+    devs.filter(d => d.kind === kind).forEach((d, i) => {
+      const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || `${kind === 'videoinput' ? 'カメラ' : 'マイク'} ${i + 1}`;
+      if (d.deviceId === cur) o.selected = true; sel.appendChild(o);
+    });
+  };
+  fill($('#camSel'), 'videoinput', stream && stream.getVideoTracks()[0]);
+  fill($('#micSel'), 'audioinput', stream && stream.getAudioTracks()[0]);
+}
+
+// 最初の画面に戻る:カメラ・マイク・動画を止め、録画中なら録画を終えて保存画面を出す
+function goHome() {
+  stopSource();
+  mode = null; fx.length = 0; ps.length = 0; shake = 0;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  $('#intro').style.display = '';
+  $('#recBtn').disabled = true; $('#flipBtn').disabled = true; $('#homeBtn').disabled = true;
+  $('#status').textContent = '未接続';
+  $('#tune').classList.remove('open'); $('#tuneBtn').setAttribute('aria-expanded', false);
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  $('#goLive').focus();
+}
+
+function onStarted(label) {
+  $('#homeBtn').disabled = false;
+  keepAwake();
+  startCalib();
+  $('#intro').style.display = 'none';
+  $('#recBtn').disabled = false;
+  $('#status').textContent = label;
+  ensureLoop();
+}
+function ensureLoop() { if (!loopOn) { loopOn = true; lastT = performance.now(); requestAnimationFrame(loop); } }
+
+// ---- 音声解析 ----
+// 帯域(Hz)。0 は上限なし
+const BANDS = { kick:[35,75], ftom:[75,120], ltom:[120,200], htom:[200,400], snare:[1500,5000], ride:[2500,6500], hihat:[8000,14000], crash:[4000,0] };
+function buildBands() {
+  const silent = ac.createGain(); silent.gain.value = 0; silent.connect(ac.destination);   // Safariで解析を止めないための無音出力
+  for (const d of DRUMS) {
+    const [lo, hi] = BANDS[d.id]; let node = inputNode;
+    const add = (type, f) => { for (let i = 0; i < 2; i++) { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = .707; node.connect(b); node = b; } };
+    if (lo) add('highpass', lo);
+    if (hi) add('lowpass', hi);
+    const an = ac.createAnalyser(); an.fftSize = (d.id === 'kick' || d.id === 'ftom' || d.id === 'ltom') ? 2048 : 1024;
+    node.connect(an); an.connect(silent);
+    bandAn[d.id] = an; bandBuf[d.id] = new Float32Array(an.fftSize);
+  }
+}
+function rmsDb(an, buf) {
+  an.getFloatTimeDomainData(buf);
+  let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return 10 * Math.log10(s / buf.length + 1e-12);
+}
+function percentile(arr, n, q) {
+  if (!n) return -90;
+  const a = Array.from(arr.subarray(0, n)).sort((x, y) => x - y);
+  return a[Math.floor((n - 1) * q)];
+}
+// 1.5秒間の環境音(エアコン、話し声、外の音など)を測り、それより十分大きい音だけを打撃として扱う
+function startCalib() {
+  calibUntil = performance.now() + 1500; calPending = true;
+  DRUMS.forEach(d => { const s = st[d.id]; s.ri = 0; s.rn = 0; s.calFloor = null; s.hist = []; });
+}
+const thrOf = d => d.thr * (1.8 - 1.3 * sens[d.id] / 100);   // 感度0→1.8倍 / 100→0.5倍
+
+function analyze(now) {
+  frameNo++;
+  const calibrating = now < calibUntil;
+  if (!calibrating && calPending) { calPending = false; DRUMS.forEach(d => st[d.id].calFloor = st[d.id].floor); }
+  const on = {}, margin = {};
+  let sumAbove = 0;
+  for (const d of DRUMS) {
+    const s = st[d.id];
+    const E = rmsDb(bandAn[d.id], bandBuf[d.id]);
+    s.hist.push(E); if (s.hist.length > 6) s.hist.shift();
+    // 35〜80ms前の音量と比べた立ち上がり
+    s.rise = s.hist.length >= 6 ? E - Math.min(s.hist[0], s.hist[1], s.hist[2], s.hist[3]) : 0;
+    s.E = E;
+    s.ring[s.ri] = E; s.ri = (s.ri + 1) % s.ring.length; s.rn = Math.min(s.rn + 1, s.ring.length);
+    // 環境音の大きさ:測定中は中央値、その後は直近5秒の下位10%(演奏中に上がりすぎないよう上限付き)
+    if (calibrating || frameNo % 15 === 0) {
+      let f = percentile(s.ring, s.rn, calibrating ? .5 : .1);
+      if (s.calFloor != null) f = Math.min(f, s.calFloor + 8);
+      s.floor = f;
+    }
+    s.above = E - s.floor;
+    sumAbove += Math.max(0, s.above - gateDb);
+    // 一度反応したら、音が減衰するまで次の反応をしない(シンバルの余韻で連続反応しない)
+    if (!s.armed) { s.peak = Math.max(s.peak, E); if (E < s.peak - 5 || now - s.last > 600) s.armed = true; }
+    margin[d.id] = s.rise - thrOf(d);
+    on[d.id] = !calibrating && s.armed && margin[d.id] > 0 && s.above > gateDb && E > -75 && now - s.last > d.refr;
+  }
+  loud = loud * .9 + (sumAbove / DRUMS.length) * .1;
+
+  // 帯域の重なりを整理する(隣り合う帯域に漏れた音で、別のパーツが光らないようにする)
+  const fire = [];
+  const snare = on.snare && st.htom.rise > 3;              // 響き線の高域 + 胴鳴りの中域
+  if (snare) fire.push('snare');
+  if (on.crash) fire.push('crash');
+  const ride = on.ride && !snare && !on.crash && st.ride.rise > st.hihat.rise;   // ライドはハイハットより中高域が強い
+  if (ride) fire.push('ride');
+  if (on.hihat && !on.crash && !ride) fire.push('hihat');
+  // タムは一度に一番はっきり立ち上がった1つだけ。バスドラムとはより強い方を採用
+  let tom = null;
+  for (const t of ['ftom', 'ltom', 'htom']) {
+    if (!on[t] || (t === 'htom' && on.snare)) continue;
+    if (!tom || margin[t] > margin[tom]) tom = t;
+  }
+  if (on.kick && tom) fire.push(margin.kick >= margin[tom] ? 'kick' : tom);
+  else { if (on.kick) fire.push('kick'); if (tom) fire.push(tom); }
+  for (const id of fire) {
+    const s = st[id]; s.last = now; s.armed = false; s.peak = s.E;
+    trigger(id, clamp(0.55 + margin[id] / 12, 0.45, 1.6));
+  }
+
+  // 音程(70〜1000Hzで最も強い成分)→ フュージョンの図形に使う。演奏中だけ
+  analyser.getFloatFrequencyData(fbuf);
+  const hz = ac.sampleRate / analyser.fftSize;
+  let bi = -1, bv = -Infinity;
+  for (let i = Math.floor(70 / hz); i <= Math.ceil(1000 / hz); i++) if (fbuf[i] > bv) { bv = fbuf[i]; bi = i; }
+  if (loud > .5 && bi > 1 && bv > -70) {
+    const y0 = fbuf[bi - 1], y1 = fbuf[bi], y2 = fbuf[bi + 1];
+    let p = 0.5 * (y0 - y2) / (y0 - 2 * y1 + y2); if (!isFinite(p)) p = 0;
+    const f = (bi + p) * hz;
+    const midi = Math.round(69 + 12 * Math.log2(f / 440));
+    const pc = ((midi % 12) + 12) % 12;
+    pitch = { f, pc, n: 3 + (pc % 6), name: NOTE[pc] + (Math.floor(midi / 12) - 1), on:true };
+  } else pitch.on = false;
+}
+
+// ---- エフェクト生成 ----
+function trigger(id, v) {
+  const d = DMAP[id]; const now = performance.now();
+  st[id].lamp = now;
+  const W = cv.width, H = cv.height, m = Math.min(W, H);
+  const x = d.pos[0] * W, y = d.pos[1] * H, c = d.color, g = genre, n = pitch.n;
+  const addShake = a => { if (!reduceMotion) shake = Math.max(shake, a); };
+
+  if (id === 'kick') {   // 赤い衝撃波
+    if (g === 'pop') {
+      fx.push({ k:'shock', x, y, c, t0:now, life:1000, R:m * .34 * v, band:m * .07, soft:true });
+      fx.push({ k:'burst', x, y, c, t0:now, life:600, R:m * .12 * v, soft:true });
+    }
+    if (g === 'rock') {
+      fx.push({ k:'shock', x, y, c, t0:now, life:520, R:m * .7 * v, band:m * .1 });
+      fx.push({ k:'shock', x, y, c, t0:now + 70, life:520, R:m * .45 * v, band:m * .05 });
+      fx.push({ k:'burst', x, y, c, t0:now, life:300, R:m * .2 * v });
+      for (let i = 0; i < 30 * v; i++) { const a = rnd(Math.PI, PI2), sp = m * rnd(.6, 1.8);
+        ps.push({ s:'spark', x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, g:m * 1.6, drag:.2, life:rnd(.4, .8), age:0, size:rnd(2, 4), c }); }
+      addShake(m * .03 * v);
+    }
+    if (g === 'fusion') {
+      fx.push({ k:'shock', x, y, c, t0:now, life:850, R:m * .4 * v, band:m * .04, n, rot:Math.random() * PI2 });
+      fx.push({ k:'poly', x, y, c, t0:now, life:700, R:m * .18 * v, n, rot:Math.random() * PI2, spin:1.2, fill:true });
+    }
+  }
+
+  if (id === 'ftom') {   // 紫の振動波
+    if (g === 'pop') fx.push({ k:'vib', x, y, c, t0:now, life:1300, R:m * .26 * v, cnt:2, lobes:6, amp:.06, hz:5, w:m * .006, soft:true });
+    if (g === 'rock') { fx.push({ k:'vib', x, y, c, t0:now, life:650, R:m * .42 * v, cnt:3, lobes:9, amp:.14, hz:11, w:m * .012 }); addShake(m * .012 * v); }
+    if (g === 'fusion') fx.push({ k:'vib', x, y, c, t0:now, life:1000, R:m * .3 * v, cnt:3, lobes:n * 2, amp:.08, hz:7, w:m * .005, n });
+  }
+
+  if (id === 'ride') {   // 水色のリング
+    if (g === 'pop') fx.push({ k:'ringset', c, t0:now, life:1400, R:m * .12 * v, w:m * .004, soft:true,
+      centers:[[x, y], [x + rnd(-1, 1) * m * .05, y + rnd(-1, 1) * m * .05]] });
+    if (g === 'rock') {
+      fx.push({ k:'ringset', c, t0:now, life:600, R:m * .2 * v, w:m * .008, centers:[[x, y], [x, y], [x, y]], stagger:70 });
+      for (let i = 0; i < 14; i++) { const a = rnd(0, PI2), sp = m * rnd(.4, 1);
+        ps.push({ s:'spark', x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, drag:.2, life:rnd(.3, .5), age:0, size:2, c }); }
+    }
+    if (g === 'fusion') { const k = n, r0 = m * .09, base = Math.random() * PI2;
+      fx.push({ k:'ringset', c, t0:now, life:1000, R:m * .07 * v, w:m * .003,
+        centers:Array.from({ length:k }, (_, i) => [x + Math.cos(base + i * PI2 / k) * r0, y + Math.sin(base + i * PI2 / k) * r0]).concat([[x, y]]) }); }
+  }
+
+  if (id === 'snare') {
+    if (g === 'pop') fx.push({ k:'ripple', x, y, c, t0:now, life:1000, cnt:2, delay:150, R:m * .26 * v, w:m * .006, soft:true });
+    if (g === 'rock') fx.push({ k:'ripple', x, y, c, t0:now, life:560, cnt:4, delay:60, R:m * .4 * v, w:m * .016 });
+    if (g === 'fusion') fx.push({ k:'ripple', x, y, c, t0:now, life:900, cnt:3, delay:90, R:m * .3 * v, w:m * .005, n, rot:Math.random() * PI2 });
+  }
+
+  if (id === 'hihat') {
+    if (g === 'pop') for (let i = 0; i < 12; i++)
+      ps.push({ s:'bokeh', x:x + rnd(-1, 1) * m * .08, y:y + rnd(-1, 1) * m * .06, vx:rnd(-1, 1) * m * .04, vy:-m * rnd(.06, .16), life:rnd(1, 1.6), age:0, size:m * rnd(.006, .018) * v, c });
+    if (g === 'rock') for (let i = 0; i < 38 * v; i++) { const a = rnd(0, PI2), sp = m * rnd(.5, 1.7);
+      ps.push({ s:'spark', x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, g:m * 1.2, drag:.15, life:rnd(.3, .6), age:0, size:rnd(1.5, 3), c }); }
+    if (g === 'fusion') { const k = n * 3, base = Math.random() * PI2;
+      for (let i = 0; i < k; i++) { const a = base + i * PI2 / k, sp = m * .45 * v;
+        ps.push({ s:'sq', x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, drag:.25, life:.85, age:0, size:m * .007, rot:a, c }); } }
+  }
+
+  if (id === 'htom') {   // 緑の流線
+    const cfg = g === 'rock' ? { cnt:7, sp:2.2, tn:1.6, life:.5, w:.008, tl:10 }
+              : g === 'pop' ? { cnt:3, sp:.9, tn:.6, life:1.1, w:.005, tl:24, glow:true }
+              : null;
+    if (cfg) for (let i = 0; i < cfg.cnt; i++) { const a = rnd(-.5, .5) + (Math.random() < .5 ? 0 : Math.PI);
+      ps.push({ s:'streak', x:x + rnd(-1, 1) * m * .05, y:y + rnd(-1, 1) * m * .05, vx:Math.cos(a) * m * cfg.sp * v, vy:Math.sin(a) * m * cfg.sp * v,
+        turn:rnd(-cfg.tn, cfg.tn), life:cfg.life, age:0, w:m * cfg.w, tl:cfg.tl, trail:[], glow:cfg.glow, c }); }
+    else fx.push({ k:'lines', x, y, c, t0:now, life:700, ang:(pitch.pc / 12) * Math.PI, cnt:n, gap:m * .03, L:m * .9 });
+  }
+
+  if (id === 'ltom') {   // 紫の軌跡(回り込む弧)
+    const cfg = g === 'rock' ? { cnt:5, sp:1.7, tn:5, life:.6, w:.011, tl:16 }
+              : g === 'pop' ? { cnt:2, sp:.75, tn:3, life:1.3, w:.008, tl:28, glow:true }
+              : null;
+    if (cfg) for (let i = 0; i < cfg.cnt; i++) { const a = rnd(0, PI2), r0 = m * .05;
+      ps.push({ s:'streak', x:x + Math.cos(a) * r0, y:y + Math.sin(a) * r0, vx:-Math.sin(a) * m * cfg.sp * v, vy:Math.cos(a) * m * cfg.sp * v,
+        turn:cfg.tn * (Math.random() < .5 ? 1 : -1), life:cfg.life, age:0, w:m * cfg.w, tl:cfg.tl, trail:[], glow:cfg.glow, c }); }
+    else fx.push({ k:'spiral', x, y, c, t0:now, life:900, R:m * .28 * v, arms:Math.max(2, n - 2), rot:Math.random() * PI2 });
+  }
+
+  if (id === 'crash') {
+    if (g === 'pop') {
+      fx.push({ k:'glow', x, y, c, t0:now, life:1500, R:m * .9, a:.5 });
+      for (let i = 0; i < 10; i++) ps.push({ s:'bokeh', x:x + rnd(-1, 1) * m * .15, y:y + rnd(-1, 1) * m * .1, vx:rnd(-1, 1) * m * .05, vy:m * rnd(.02, .08), life:rnd(1.2, 2), age:0, size:m * rnd(.01, .025), c });
+    }
+    if (g === 'rock') {
+      fx.push({ k:'flash', c:'#fff3c4', t0:now, life:340, a:.55 });
+      fx.push({ k:'rays', x, y, c, t0:now, life:460, L:m * 1.2, angs:Array.from({ length:18 }, () => rnd(0, PI2)), w:m * .008 });
+      addShake(m * .02);
+    }
+    if (g === 'fusion') {
+      fx.push({ k:'star', x, y, c, t0:now, life:1000, R:m * .45, n, rot:Math.random() * PI2 });
+      fx.push({ k:'rays', x, y, c, t0:now, life:700, L:m * .7, angs:Array.from({ length:n * 2 }, (_, i) => i * Math.PI / n), w:m * .003 });
+    }
+  }
+  if (fx.length > 300) fx.splice(0, fx.length - 300);
+  if (ps.length > 2500) ps.splice(0, ps.length - 2500);
+}
+
+// ---- 描画 ----
+function rgba(hex, a) { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${clamp(a, 0, 1)})`; }
+function polyPath(x, y, r, n, rot) { ctx.beginPath(); for (let i = 0; i < n; i++) { const a = rot + i * PI2 / n; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); }
+function circlePath(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(0, r), 0, PI2); }
+
+function drawFx(f, now) {
+  const age = now - f.t0;
+  const total = f.life + (f.cnt && f.delay ? (f.cnt - 1) * f.delay : 0) + (f.stagger ? (f.centers.length - 1) * f.stagger : 0);
+  if (age >= total) return false;
+  if (age < 0) return true;   // 少し遅れて出る効果はまだ描かない
+  const a = age / f.life;
+  switch (f.k) {
+    case 'burst': {
+      const r = f.R * (.25 + .75 * easeOut(a)), al = Math.pow(1 - a, f.soft ? 1.4 : 2.2);
+      const gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, Math.max(1, r));
+      gr.addColorStop(0, rgba(f.soft ? '#ffd0c8' : '#ffffff', al * .9));
+      gr.addColorStop(f.soft ? .25 : .15, rgba(f.c, al * .85));
+      gr.addColorStop(1, rgba(f.c, 0));
+      ctx.fillStyle = gr; circlePath(f.x, f.y, r); ctx.fill(); break;
+    }
+    case 'ring': {
+      ctx.strokeStyle = rgba(f.c, 1 - a); ctx.lineWidth = f.w * (1 - a) + 1;
+      circlePath(f.x, f.y, f.R * easeOut(a)); ctx.stroke(); break;
+    }
+    case 'ripple': {
+      for (let j = 0; j < f.cnt; j++) {
+        const aj = (age - j * f.delay) / f.life; if (aj <= 0 || aj >= 1) continue;
+        const r = f.R * easeOut(aj) * (1 + j * .15), al = 1 - aj;
+        const path = () => f.n ? polyPath(f.x, f.y, r, f.n, f.rot + (j % 2 ? -1 : 1) * aj * 1.2) : circlePath(f.x, f.y, r);
+        if (f.soft) { ctx.strokeStyle = rgba(f.c, al * .22); ctx.lineWidth = f.w * 5; path(); ctx.stroke(); }
+        ctx.strokeStyle = rgba(f.c, al * .95); ctx.lineWidth = f.w * (1 - aj * .6) + 1; path(); ctx.stroke();
+      }
+      break;
+    }
+    case 'poly': {
+      const r = f.R * easeOut(a), rot = f.rot + a * f.spin, al = 1 - a;
+      polyPath(f.x, f.y, r, f.n, rot);
+      if (f.fill) { ctx.fillStyle = rgba(f.c, al * .18); ctx.fill(); }
+      ctx.strokeStyle = rgba(f.c, al); ctx.lineWidth = 2.5; ctx.stroke();
+      polyPath(f.x, f.y, r * .6, f.n, -rot); ctx.strokeStyle = rgba(f.c, al * .7); ctx.lineWidth = 1.5; ctx.stroke();
+      break;
+    }
+    case 'glow': {
+      const al = f.a * Math.sin(Math.PI * Math.min(1, a * 1.6)) * (1 - a);
+      const gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.R);
+      gr.addColorStop(0, rgba(f.c, al)); gr.addColorStop(1, rgba(f.c, 0));
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, cv.width, cv.height); break;
+    }
+    case 'shock': {   // 外側の縁が最も明るく、内側へ薄れていく輪
+      const r = f.R * easeOut(a), al = Math.pow(1 - a, f.soft ? 1.3 : 1.8), band = f.band * (1 - a * .5);
+      if (f.n) {
+        const rot = f.rot + a * .6;
+        polyPath(f.x, f.y, r, f.n, rot); ctx.strokeStyle = rgba(f.c, al * .35); ctx.lineWidth = band; ctx.stroke();
+        polyPath(f.x, f.y, r, f.n, rot); ctx.strokeStyle = rgba('#ffffff', al * .8); ctx.lineWidth = 2; ctx.stroke();
+        break;
+      }
+      const gr = ctx.createRadialGradient(f.x, f.y, Math.max(0, r - band), f.x, f.y, Math.max(1, r));
+      gr.addColorStop(0, rgba(f.c, 0)); gr.addColorStop(.75, rgba(f.c, al * (f.soft ? .35 : .6)));
+      gr.addColorStop(1, rgba(f.soft ? f.c : '#ffffff', al * (f.soft ? .7 : .95)));
+      ctx.fillStyle = gr; circlePath(f.x, f.y, r); ctx.fill(); break;
+    }
+    case 'vib': {   // 輪の形そのものが震えながら広がる
+      const t = age / 1000;
+      for (let j = 0; j < f.cnt; j++) {
+        const aj = clamp(a * (1 + j * .25), 0, 1); if (aj >= 1) continue;
+        const rr = f.R * easeOut(aj) * (1 - j * .18), al = 1 - aj;
+        const amp = f.amp * (1 - aj) * Math.sin(t * f.hz * PI2 + j);
+        ctx.beginPath();
+        const steps = 120;
+        for (let i = 0; i <= steps; i++) {
+          const th = i / steps * PI2;
+          let r = rr * (1 + amp * Math.sin(f.lobes * th + j * .7));
+          if (f.n) r *= Math.cos(Math.PI / f.n) / Math.cos(((th % (PI2 / f.n)) - Math.PI / f.n));   // 多角形の形に沿わせる
+          const px = f.x + Math.cos(th) * r, py = f.y + Math.sin(th) * r;
+          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+        if (f.soft) { ctx.strokeStyle = rgba(f.c, al * .2); ctx.lineWidth = f.w * 5; ctx.stroke(); }
+        ctx.strokeStyle = rgba(f.c, al); ctx.lineWidth = f.w; ctx.stroke();
+      }
+      break;
+    }
+    case 'ringset': {   // 細く澄んだ輪(ライドの「チーン」という余韻)
+      f.centers.forEach(([cx, cy], j) => {
+        const aj = (age - j * (f.stagger || 0)) / f.life; if (aj <= 0 || aj >= 1) return;
+        const r = f.R * (.3 + .7 * easeOut(aj)) * (1 + (f.stagger ? j * .35 : 0)), al = 1 - aj;
+        if (f.soft) { ctx.strokeStyle = rgba(f.c, al * .18); ctx.lineWidth = f.w * 6; circlePath(cx, cy, r); ctx.stroke(); }
+        ctx.strokeStyle = rgba(f.c, al); ctx.lineWidth = f.w; circlePath(cx, cy, r); ctx.stroke();
+        ctx.fillStyle = rgba('#ffffff', al * .8); circlePath(cx, cy, f.w * 1.2); ctx.fill();
+      });
+      break;
+    }
+    case 'flash': { ctx.fillStyle = rgba(f.c, f.a * Math.pow(1 - a, 2)); ctx.fillRect(0, 0, cv.width, cv.height); break; }
+    case 'rays': {
+      const L = f.L * easeOut(a), al = 1 - a; ctx.lineCap = 'round';
+      for (const g of f.angs) {
+        const gr = ctx.createLinearGradient(f.x, f.y, f.x + Math.cos(g) * L, f.y + Math.sin(g) * L);
+        gr.addColorStop(0, rgba('#ffffff', al)); gr.addColorStop(.3, rgba(f.c, al)); gr.addColorStop(1, rgba(f.c, 0));
+        ctx.strokeStyle = gr; ctx.lineWidth = f.w * (1 - a * .5);
+        ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(g) * L, f.y + Math.sin(g) * L); ctx.stroke();
+      }
+      break;
+    }
+    case 'star': {
+      const r = f.R * easeOut(a), rot = f.rot + a * .8, al = 1 - a, k = f.n * 2;
+      ctx.beginPath();
+      for (let i = 0; i <= k; i++) { const rr = i % 2 ? r * .38 : r, g = rot + i * Math.PI / f.n;
+        const px = f.x + Math.cos(g) * rr, py = f.y + Math.sin(g) * rr; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      ctx.closePath(); ctx.fillStyle = rgba(f.c, al * .15); ctx.fill();
+      ctx.strokeStyle = rgba(f.c, al); ctx.lineWidth = 2; ctx.stroke();
+      break;
+    }
+    case 'lines': {   // フュージョンのハイタム:音程で角度が決まる平行線
+      const al = Math.sin(Math.PI * a), off = (a - .5) * f.gap * 6;
+      const cx = Math.cos(f.ang), sy = Math.sin(f.ang), nx = -sy, ny = cx;
+      ctx.strokeStyle = rgba(f.c, al * .9); ctx.lineWidth = 2;
+      for (let i = 0; i < f.cnt; i++) {
+        const o = (i - (f.cnt - 1) / 2) * f.gap + off, bx = f.x + nx * o, by = f.y + ny * o, h = f.L / 2 * easeOut(Math.min(1, a * 2));
+        ctx.beginPath(); ctx.moveTo(bx - cx * h, by - sy * h); ctx.lineTo(bx + cx * h, by + sy * h); ctx.stroke();
+      }
+      break;
+    }
+    case 'spiral': {  // フュージョンのロータム:対数らせん
+      const al = 1 - a, grow = easeOut(Math.min(1, a * 1.5));
+      ctx.strokeStyle = rgba(f.c, al); ctx.lineWidth = 2;
+      for (let j = 0; j < f.arms; j++) {
+        ctx.beginPath();
+        for (let t = 0; t <= 1; t += .02) {
+          const th = f.rot + j * PI2 / f.arms + t * Math.PI * 2.2 * grow + a, r = f.R * t * grow;
+          const px = f.x + Math.cos(th) * r, py = f.y + Math.sin(th) * r; t ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.stroke();
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+function drawParticle(p, dt) {
+  p.age += dt; if (p.age >= p.life) return false;
+  if (p.turn) { const c = Math.cos(p.turn * dt), s = Math.sin(p.turn * dt), vx = p.vx * c - p.vy * s; p.vy = p.vx * s + p.vy * c; p.vx = vx; }
+  if (p.g) p.vy += p.g * dt;
+  if (p.drag) { const k = Math.pow(p.drag, dt); p.vx *= k; p.vy *= k; }
+  p.x += p.vx * dt; p.y += p.vy * dt;
+  const a = p.age / p.life, al = 1 - a;
+  switch (p.s) {
+    case 'spark':
+      ctx.strokeStyle = rgba(p.c, al); ctx.lineWidth = p.size; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); ctx.stroke(); break;
+    case 'bokeh': {
+      const r = p.size * (1 + a * .5), gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      gr.addColorStop(0, rgba(p.c, al * .55)); gr.addColorStop(.6, rgba(p.c, al * .25)); gr.addColorStop(1, rgba(p.c, 0));
+      ctx.fillStyle = gr; circlePath(p.x, p.y, r); ctx.fill(); break;
+    }
+    case 'sq':
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + a * 2); ctx.fillStyle = rgba(p.c, al);
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore(); break;
+    case 'streak': {
+      p.trail.push(p.x, p.y); if (p.trail.length > p.tl * 2) p.trail.splice(0, 2);
+      const tr = p.trail, L = tr.length / 2; if (L < 2) break;
+      ctx.lineCap = 'round';
+      if (p.glow) {
+        ctx.strokeStyle = rgba(p.c, al * .15); ctx.lineWidth = p.w * 3.5;
+        ctx.beginPath(); ctx.moveTo(tr[0], tr[1]); for (let j = 1; j < L; j++) ctx.lineTo(tr[2 * j], tr[2 * j + 1]); ctx.stroke();
+      }
+      for (let j = 1; j < L; j++) {
+        const q = j / L; ctx.strokeStyle = rgba(p.c, al * q); ctx.lineWidth = p.w * q;
+        ctx.beginPath(); ctx.moveTo(tr[2 * j - 2], tr[2 * j - 1]); ctx.lineTo(tr[2 * j], tr[2 * j + 1]); ctx.stroke();
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+// フュージョン時の背景模様:いま鳴っている音程で角の数と色が変わる
+let mandalaN = 6, mandalaHue = 270;
+function drawMandala(now) {
+  const W = cv.width, H = cv.height, m = Math.min(W, H);
+  if (pitch.on) { mandalaN = pitch.n; mandalaHue = pitch.pc * 30; }
+  const e = clamp(loud / 10, 0, 1);
+  if (e < .03) return;
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(now * .00015 * (1 + mandalaN / 6));
+  ctx.lineWidth = 1.5;
+  for (let k = 0; k < 6; k++) {
+    const r = m * (.07 + k * .065) * (1 + e * .18);
+    ctx.strokeStyle = `hsla(${mandalaHue},85%,68%,${e * .35})`;
+    polyPath(0, 0, r, mandalaN, k * Math.PI / mandalaN); ctx.stroke();
+  }
+  ctx.strokeStyle = `hsla(${mandalaHue},85%,68%,${e * .22})`;
+  ctx.beginPath();
+  for (let i = 0; i < mandalaN; i++) { const g = i * PI2 / mandalaN; ctx.moveTo(0, 0); ctx.lineTo(Math.cos(g) * m * .42, Math.sin(g) * m * .42); }
+  ctx.stroke(); ctx.restore();
+}
+
+let lastT = 0, lastUi = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+  if (analyser && srcNode) analyze(now);
+  const W = cv.width, H = cv.height;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  if (shake > .5) { ctx.translate(rnd(-1, 1) * shake, rnd(-1, 1) * shake); shake *= Math.pow(.015, dt); } else shake = 0;
+  if (video && video.readyState >= 2) {
+    ctx.save(); if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, W, H); ctx.restore();
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  if (genre === 'fusion') drawMandala(now);
+  for (let i = 0; i < fx.length; i++) if (!drawFx(fx[i], now)) { fx.splice(i, 1); i--; }
+  for (let i = 0; i < ps.length; i++) if (!drawParticle(ps[i], dt)) { ps.splice(i, 1); i--; }
+  ctx.restore();
+  if (now - lastUi > 50) { updateUi(now); lastUi = now; }
+}
+
+function updateUi(now) {
+  for (const d of DRUMS) {
+    const s = st[d.id], lit = now - s.lamp < 130;
+    rows[d.id].bar.style.transform = `scaleX(${s.above > gateDb ? clamp(s.rise / (thrOf(d) * 2), 0, 1) : 0})`;
+    rows[d.id].lamp.classList.toggle('on', lit);
+    strip[d.id].classList.toggle('on', lit);
+  }
+  if (analyser && srcNode) {
+    analyser.getFloatTimeDomainData(tbuf);
+    let pk = 0; for (let i = 0; i < tbuf.length; i++) { const v = Math.abs(tbuf[i]); if (v > pk) pk = v; }
+    const db = 20 * Math.log10(pk + 1e-9);
+    $('#lvl i').style.width = clamp((db + 60) / 60, 0, 1) * 100 + '%';
+    $('#lvl').classList.toggle('clip', pk > .98);
+    if (rec && pk > recPeak) recPeak = pk;
+  }
+  if (rec) { const s = Math.floor((now - recStart) / 1000); $('#recTxt').textContent = `停止 ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
+  $('#hud').textContent = now < calibUntil ? '環境音を測っています。1.5秒ほど静かにしてください' : genre === 'fusion' && pitch.on ? `音程 ${pitch.name}(${Math.round(pitch.f)}Hz)→ ${pitch.n}角形` : '';
+}
+
+// ---- 録画(合成後の映像 + マイク音声)----
+function startRec() {
+  if (!window.MediaRecorder) { showMsg('このブラウザは録画に対応していません。Chrome か Edge を使ってください。'); return; }
+  const vs = cv.captureStream(30);
+  const aTracks = recDest.stream.getAudioTracks();
+  aTracks.forEach(t => t.enabled = true);
+  const ms = new MediaStream([...vs.getVideoTracks(), ...aTracks]);
+  // 音声の形式まで指定する。「video/mp4」だけだとChromeは音声をOpusで記録し、
+  // 写真アプリ・QuickTime・Windowsの標準プレーヤーでは音が出ない動画になるため
+  const types = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1.4D401F,mp4a.40.2',
+    'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+    'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus',
+    'video/mp4', 'video/webm',
+  ];
+  const type = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  let r;
+  try { r = new MediaRecorder(ms, Object.assign({ videoBitsPerSecond:8e6, audioBitsPerSecond:192000 }, type ? { mimeType:type } : {})); }
+  catch (e) { showMsg('録画を開始できませんでした:' + e.message); return; }
+  rec = r;
+  recChunks = []; recPeak = 0;
+  rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+  rec.onstop = () => {
+    const mime = r.mimeType || type || 'video/webm';
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    const name = `drum-visual_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${mime.includes('mp4') ? 'mp4' : 'webm'}`;
+    const file = new File(recChunks, name, { type:mime.split(';')[0] });
+    const btns = [];
+    if (!dlNs && navigator.canShare && navigator.canShare({ files:[file] }))
+      btns.push({ label:'写真に保存・共有', primary:true, keep:true, onClick:() => navigator.share({ files:[file] }).catch(() => {}) });
+    btns.push({ label:'ファイルとして保存', primary:!btns.length, keep:true, onClick:() => downloadFile(file) });
+    btns.push({ label:'閉じる' });
+    const silent = recPeak < .003;
+    dialog(silent ? '録画できましたが、音が入っていません' : '録画できました', `${name}(${(file.size / 1048576).toFixed(1)}MB)` +
+      (silent ? (mode === 'file'
+        ? '\n録画中に動画の音が流れていませんでした。動画が再生されているか、動画自体に音が入っているかを確かめてください。'
+        : '\n録画中にマイクの音が届いていませんでした。「調整」パネルの入力レベルが動くか、マイクの選択を確かめてください。') : '') +
+      (btns.length > 2 ? '\niPhone・iPadでは「写真に保存・共有」→「ビデオを保存」で写真アプリに入ります。' : ''), btns);
+  };
+  rec.start(1000);
+  recStart = performance.now();
+  $('#recBtn').classList.add('on');
+}
+function stopRec() {
+  if (!rec) return;
+  const r = rec; rec = null; r.stop();
+  $('#recBtn').classList.remove('on'); $('#recTxt').textContent = '録画';
+}
+</script>
+</body>
+</html>
