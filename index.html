@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ドラム・ライブビジュアライザー</title>
-<meta name="version" content="2.1.0">
+<meta name="version" content="2.1.5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -108,7 +108,7 @@ body.has-key .note .hint-key,body.has-touch .note .hint-tap{display:block}
 /* ===== 映像を最大に:操作バーを重ねて表示し、操作しないと自動で隠す ===== */
 body{display:block}
 #stage{position:fixed;inset:0}
-#cv.fill{object-fit:cover}
+#cv.fill{position:absolute;top:env(safe-area-inset-top,0px);left:env(safe-area-inset-left,0px);width:calc(100% - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:calc(100% - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
 .bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:linear-gradient(to top,rgba(10,11,16,.94),rgba(10,11,16,.78));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,.08);transition:transform .25s ease,opacity .25s ease}
 body.ui-hidden .bar{transform:translateY(100%);opacity:0;pointer-events:none}
 body.ui-hidden{cursor:none}
@@ -137,7 +137,7 @@ body.ui-hidden #uiHint.show{opacity:1}
   <div id="hud"></div>
   <div id="flash"></div>
   <div id="recBadge" aria-hidden="true"><span class="dot"></span><span id="recBadgeT">REC</span></div>
-  <div id="uiHint">画面をタップすると操作ボタンが出ます</div>
+  <div id="uiHint">画面をタップするか、上へスワイプすると操作ボタンが出ます</div>
 
   <div id="intro">
     <div class="box">
@@ -193,7 +193,7 @@ body.ui-hidden #uiHint.show{opacity:1}
     <input type="range" id="gateIn" min="6" max="30" value="14" style="width:100%">
     <p class="note" style="margin-top:.4em">叩いていないのに光るときは右へ動かしてください。</p>
     <p style="margin-top:1.2em;display:flex;flex-wrap:wrap;gap:10px"><button class="btn" id="recal">環境音を測り直す</button><button class="btn" id="reset">初期値に戻す</button></p>
-    <p class="note" style="margin-top:1.4em">バージョン 2.1.0</p>
+    <p class="note" style="margin-top:1.4em">バージョン 2.1.5</p>
   </aside>
 </div>
 
@@ -227,7 +227,7 @@ body.ui-hidden #uiHint.show{opacity:1}
 
 <script>
 'use strict';
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.5';
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d');
 const PI2 = Math.PI * 2;
@@ -388,19 +388,36 @@ $('#camSel').onchange = () => { if (mode === 'live') startLive(); };
 $('#micSel').onchange = () => { if (mode === 'live') startLive(); };
 // ---- 操作バーの自動非表示(演奏中は映像を最大に見せる)----
 let uiTimer = 0, tapRevealed = false, hintShown = false;
-const uiBusy = () => !mode || $('#tune').classList.contains('open') || !$('#dlg').hidden;
-function showUI() {
-  document.body.classList.remove('ui-hidden');
-  clearTimeout(uiTimer);
-  uiTimer = setTimeout(() => {
-    if (uiBusy() || document.querySelector('.bar:hover')) { showUI(); return; }
-    document.body.classList.add('ui-hidden');
-    if (!hintShown) {   // 最初の1回だけ、出し方を案内する
-      hintShown = true; $('#uiHint').classList.add('show');
-      setTimeout(() => $('#uiHint').classList.remove('show'), 3500);
-    }
-  }, 3000);
+const UI_HIDE_MS = 2000;   // 操作しなくなってからバーを隠すまでの時間
+const canHover = matchMedia('(hover: hover)').matches;
+function hideUI() {   // 下スワイプ・タップで隠す(自動では隠さない)
+  if (uiBusy()) return;
+  clearTimeout(uiTimer); document.body.classList.add('ui-hidden');
+  if (!hintShown) {   // 最初の1回だけ、出し方を案内する
+    hintShown = true; $('#uiHint').classList.add('show');
+    setTimeout(() => $('#uiHint').classList.remove('show'), 3500);
+  }
 }
+const uiBusy = () => !mode || $('#tune').classList.contains('open') || !$('#dlg').hidden;
+function showUI() {   // バーを出す。自動で隠す動きはやめた(隠すのは下スワイプかタップ)
+  clearTimeout(uiTimer);
+  document.body.classList.remove('ui-hidden');
+}
+// スワイプ:下へスワイプでバーを隠す、上へスワイプで出す(縦の動きがはっきりしているときだけ)
+let swY = null, swX = 0, swT = 0, swiped = false;
+window.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { swY = null; return; }
+  swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = performance.now(); swiped = false;
+}, { passive:true, capture:true });
+window.addEventListener('touchend', e => {
+  if (swY === null || !mode) return;
+  const t = e.changedTouches[0], dy = t.clientY - swY, dx = t.clientX - swX;
+  swY = null;
+  if (performance.now() - swT > 800 || Math.abs(dy) < 40 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+  if ($('#tune').classList.contains('open') || !$('#dlg').hidden) return;   // 調整パネルの中のスクロールでは反応しない
+  swiped = true;
+  if (dy > 0) hideUI(); else showUI();
+}, { passive:true, capture:true });
 window.addEventListener('pointerdown', () => { tapRevealed = document.body.classList.contains('ui-hidden'); showUI(); }, true);
 ['pointermove', 'keydown', 'wheel'].forEach(ev => window.addEventListener(ev, showUI, { passive:true, capture:true }));
 
@@ -415,6 +432,7 @@ let fill = false;
 try { fill = !!JSON.parse(localStorage.getItem('drumviz-fill') || 'false'); } catch (e) {}
 function setFill(on) {
   fill = on; cv.classList.toggle('fill', on);
+  setTimeout(sizeCanvas, 0);
   $('#fitBtn').setAttribute('aria-pressed', on); $('#fitBtn').textContent = on ? '全体を表示' : '画面いっぱい';
   try { localStorage.setItem('drumviz-fill', JSON.stringify(on)); } catch (e) {}
 }
@@ -436,7 +454,9 @@ if (fsReq && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
 }
 
 $('#stage').addEventListener('click', e => {
+  if (swiped) { swiped = false; tapRevealed = false; return; }
   if (tapRevealed) { tapRevealed = false; return; }   // 隠れていたバーを出すためのタップでは一時停止しない
+  if (mode === 'live' && (e.target === cv || e.target.id === 'stage')) { hideUI(); return; }   // 撮影中は、画面をタップするとすぐバーを隠す
   if (mode === 'file' && e.target === cv && video) video.paused ? video.play() : video.pause();
   if (mode === 'audio' && e.target === cv && audioEl) audioEl.paused ? audioEl.play() : audioEl.pause();
 });
@@ -506,11 +526,33 @@ function stopSource() {
   audioName = '';
 }
 
+// キャンバスの大きさ
+//  全体を表示:映像そのものの大きさ
+//  画面いっぱい:画面(切り欠きを除いた範囲)と同じ縦横比。映像は画面に合わせて切り抜いて描き、
+//               エフェクトもこの範囲に出すので、iPhone・iPadの画面からはみ出さない
 function sizeCanvas() {
-  let w = video.videoWidth || 1280, h = video.videoHeight || 720;
-  if (w > 1920) { h = Math.round(h * 1920 / w); w = 1920; }
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  if (rec) return;   // 録画中に大きさを変えると録画が壊れるため変えない
+  let w, h;
+  if (fill) {
+    const r = cv.getBoundingClientRect();
+    const bw = Math.max(1, r.width), bh = Math.max(1, r.height);
+    const scale = Math.min(1920 / Math.max(bw, bh), Math.min(2, window.devicePixelRatio || 1));
+    w = Math.round(bw * scale / 2) * 2; h = Math.round(bh * scale / 2) * 2;
+  } else {
+    w = (video && video.videoWidth) || 1280; h = (video && video.videoHeight) || 720;
+    if (w > 1920) { h = Math.round(h * 1920 / w); w = 1920; }
+  }
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; fx.length = 0; ps.length = 0; }
 }
+// 映像をキャンバスいっぱいに、縦横比を保ったまま中央で切り抜いて描く
+function drawVideoCover(v, W, H) {
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return;
+  const s = Math.max(W / vw, H / vh), sw = W / s, sh = H / s;
+  ctx.drawImage(v, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, W, H);
+}
+window.addEventListener('resize', () => { if (fill) setTimeout(sizeCanvas, 50); });
+window.addEventListener('orientationchange', () => setTimeout(sizeCanvas, 300));
 
 async function startLive() {
   const isSafari = /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
@@ -1973,7 +2015,7 @@ function loop(now) {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   if (shake > .5) { ctx.translate(rnd(-1, 1) * shake, rnd(-1, 1) * shake); shake *= Math.pow(.015, dt); } else shake = 0;
   if (video && video.readyState >= 2) {
-    ctx.save(); if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, W, H); ctx.restore();
+    ctx.save(); if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); } drawVideoCover(video, W, H); ctx.restore();
   }
   ctx.globalCompositeOperation = 'lighter';
   if (genre === 'nature') drawNatureBg(now);
