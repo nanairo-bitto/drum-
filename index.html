@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ドラム・ライブビジュアライザー</title>
+<meta name="version" content="2.1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -24,8 +25,8 @@ body{
 .srcvid{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0;pointer-events:none}
 
 /* 開始画面 */
-#intro{position:absolute;inset:0;z-index:3;display:flex;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px;background:radial-gradient(ellipse at 50% 120%,#1a1030 0%,#000 60%)}
-#intro .box{max-width:34rem;margin:auto}
+#intro{position:fixed;top:0;left:0;right:0;bottom:var(--barH,70px);z-index:3;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:24px;padding-top:calc(24px + env(safe-area-inset-top,0px));background:radial-gradient(ellipse at 50% 120%,#1a1030 0%,#000 60%)}
+#intro .box{max-width:34rem;width:100%;margin:auto;flex:0 0 auto}   /* 画面に収まらないときは上から並べ、スクロールで全部見られる */
 #intro h1{font-size:clamp(1.8rem,4.5vw,3rem);line-height:1.25;margin:0 0 .6em;font-weight:700;letter-spacing:.02em}
 #intro p{color:var(--mute);line-height:1.8;margin:0 0 1.4em}
 .legend{display:grid;grid-template-columns:repeat(2,auto);gap:.5em 1.4em;margin:1.8em 0 0;color:var(--ink);font-size:.95rem;justify-content:start}
@@ -83,17 +84,48 @@ button,.btn,select{font:inherit;color:var(--ink)}
 #flash{position:absolute;z-index:2;left:50%;top:40%;transform:translate(-50%,-50%);font-size:clamp(2rem,7vw,4.5rem);font-weight:700;pointer-events:none;opacity:0;text-shadow:0 2px 20px rgba(0,0,0,.6)}
 #flash.show{animation:gname 1.1s ease-out}
 @keyframes gname{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
-#msg{position:absolute;z-index:6;left:50%;bottom:16px;transform:translateX(-50%);background:#2a1214;border:1px solid var(--kick);padding:.7em 1em;border-radius:10px;max-width:90%;line-height:1.6;display:none}
+#msg{position:fixed;z-index:30;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:#2a1214;border:1px solid var(--kick);padding:.7em 2.6em .7em 1em;border-radius:10px;width:max-content;max-width:min(92vw,34rem);max-height:60vh;overflow:auto;line-height:1.6;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#msg .x{position:absolute;top:.35em;right:.4em;border:0;background:none;color:var(--ink);font-size:1.2rem;line-height:1;padding:.3em .45em;cursor:pointer}
 #msg.show{display:block}
-#dlg{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:20px;z-index:5}
+#dlg{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:20px;padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:25;overflow:auto}
 #dlg[hidden]{display:none}
-#dlg .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;max-width:30rem;width:100%}
+#tune h3.tsec{font-size:1rem;margin:1.6em 0 .3em;padding-top:1.2em;border-top:1px solid var(--line)}
+.bk-row{display:flex;align-items:center;gap:10px;margin:.6em 0;flex-wrap:wrap}
+.bk-row .note{margin:0}
+label.chk{display:flex;gap:.5em;align-items:center;font-size:.9rem;margin:.7em 0}
+#tune input[type=range].bk{width:100%}
+#dlg .card{max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;max-width:30rem;width:100%}
 #dlg h3{margin:0 0 .5em;font-size:1.15rem}
 #dlg p{margin:0 0 1.2em;color:var(--mute);line-height:1.7;white-space:pre-line}
 .prog{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-bottom:1.2em}
 .prog i{display:block;height:100%;width:0;background:var(--snare);transition:width .3s}
 .drum button.nm{background:none;border:0;padding:0;text-align:left;cursor:pointer;font-weight:700;justify-self:start}
 #stage.drop::after{content:"ここに動画をドロップ";position:absolute;inset:12px;z-index:7;display:grid;place-items:center;border:3px dashed var(--ride);border-radius:16px;background:rgba(0,0,0,.6);font-size:1.4rem;font-weight:700;pointer-events:none}
+.hint-key,.hint-tap{display:none}
+body.has-key .hint-key,body.has-touch .hint-tap{display:inline}
+.note .hint-key,.note .hint-tap{display:none}
+body.has-key .note .hint-key,body.has-touch .note .hint-tap{display:block}
+/* ===== 映像を最大に:操作バーを重ねて表示し、操作しないと自動で隠す ===== */
+body{display:block}
+#stage{position:fixed;inset:0}
+#cv.fill{object-fit:cover}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:linear-gradient(to top,rgba(10,11,16,.94),rgba(10,11,16,.78));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,.08);transition:transform .25s ease,opacity .25s ease}
+body.ui-hidden .bar{transform:translateY(100%);opacity:0;pointer-events:none}
+body.ui-hidden{cursor:none}
+.controls{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.controls::-webkit-scrollbar{display:none}
+.controls>*{flex:0 0 auto}
+#tune{padding-bottom:calc(var(--barH,70px) + 40px)}
+body #intro{padding-bottom:24px;padding-top:calc(44px + env(safe-area-inset-top,0px))}   /* 上のバーや画面の切り欠きにタイトルが隠れないよう、上に余白(小さい画面の設定より優先) */   /* 初期画面は操作バーの上で終わるので、バーと重ならない */
+#intro p.hint{margin:1.1em 0 0}   /* ボタンと説明文がくっつかないよう、すき間をあける */   /* 操作バーに説明が隠れないよう、下に余白 */
+#hud{top:calc(12px + env(safe-area-inset-top,0px))}
+#recBadge{position:absolute;z-index:3;top:calc(12px + env(safe-area-inset-top,0px));right:14px;display:none;align-items:center;gap:.45em;padding:.3em .7em;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none}
+#recBadge .dot{width:.65em;height:.65em;border-radius:50%;background:var(--kick);animation:blink 1s steps(2) infinite}
+body.recording.ui-hidden #recBadge{display:flex}
+#uiHint{position:absolute;z-index:3;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:.35em .9em;border-radius:999px;background:rgba(0,0,0,.5);color:rgba(255,255,255,.8);font-size:.8rem;pointer-events:none;opacity:0;transition:opacity .4s}
+body.ui-hidden #uiHint.show{opacity:1}
+@media (max-width:640px){.btn{padding:.5em .85em}.seg button{padding:.5em .75em}.controls{gap:8px;padding-left:10px;padding-right:10px}}
+@media (prefers-reduced-motion:reduce){.bar{transition:none}}
 @media (prefers-reduced-motion:reduce){#flash.show{animation:none}#tune{transition:none}}
 @media (max-height:640px),(max-width:640px){#intro{padding:16px}#intro h1{font-size:1.6rem;margin-bottom:.4em}#intro p{margin-bottom:1em}.legend{font-size:.85rem;gap:.35em 1em;margin-top:1.2em}.hint{margin-top:1em}}
 @media (max-width:640px){.legend{grid-template-columns:auto}.status{display:none}}
@@ -104,6 +136,8 @@ button,.btn,select{font:inherit;color:var(--ink)}
   <canvas id="cv" width="1280" height="720" aria-label="カメラ映像とエフェクト"></canvas>
   <div id="hud"></div>
   <div id="flash"></div>
+  <div id="recBadge" aria-hidden="true"><span class="dot"></span><span id="recBadgeT">REC</span></div>
+  <div id="uiHint">画面をタップすると操作ボタンが出ます</div>
 
   <div id="intro">
     <div class="box">
@@ -113,8 +147,10 @@ button,.btn,select{font:inherit;color:var(--ink)}
         <button class="btn primary" id="goLive">カメラとマイクで始める</button>
         <button class="btn" id="goFile">演奏動画ファイルで試す</button>
         <input type="file" id="fileIn" accept="video/*" hidden>
+        <button class="btn" id="goAudio">音声ファイル・GarageBandの曲で試す</button>
+        <input type="file" id="audioIn" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.aac,.caf,.qta,.band" hidden>
       </div>
-      <p class="hint" id="hint">ドラムがなくても、キーボードの <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd> で各エフェクトを試せます。<br>演奏動画は、写真アプリやFinderからこの画面にドラッグしても読み込めます。</p>
+      <p class="hint" id="hint"><span class="hint-key">ドラムがなくても、キーボードの <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd> で各エフェクトを試せます。<br></span><span class="hint-tap">ドラムがなくても、開始後に「調整」パネルのドラム名をタップすると各エフェクトを試せます。<br></span><span class="hint-key">演奏動画や音声ファイルは、写真アプリやFinderからこの画面にドラッグしても読み込めます。</span></p>
       <div class="legend">
         <span style="--c:var(--kick)">バスドラム(キック) 赤い衝撃波</span>
         <span style="--c:var(--snare)">スネア 青い波紋</span>
@@ -130,6 +166,7 @@ button,.btn,select{font:inherit;color:var(--ink)}
 
   <aside id="tune" aria-label="調整">
     <h2>調整</h2>
+    <p class="note"><span class="hint-key">ドラムがなくても、キーボードの A〜K で各エフェクトを試せます。</span><span class="hint-tap">ドラムがなくても、下のドラム名をタップすると各エフェクトを試せます。</span></p>
     <p class="note">叩くと各メーターが伸びます。中央の線を越えると反応します。反応しない音は感度を上げ、ほかの音につられて光る音は感度を下げてください。</p>
     <label class="f" for="camSel">カメラ</label>
     <select id="camSel"></select>
@@ -137,16 +174,27 @@ button,.btn,select{font:inherit;color:var(--ink)}
     <select id="micSel"></select>
     <label class="f">入力レベル(赤くなったら音が割れています)</label>
     <div class="lvl" id="lvl"><i></i></div>
+    <h3 class="tsec">伴奏を流しながら撮る</h3>
+    <p class="note">イヤホンで伴奏を聴きながら叩くと、録画に伴奏がきれいな音で重なります。エフェクトはマイクで拾ったドラムの音だけに反応します。</p>
+    <div class="bk-row"><button class="btn" id="bkPick">曲を選ぶ</button><span class="note" id="bkName">未選択</span></div>
+    <input type="file" id="bkIn" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.aac,.caf,.qta" hidden>
+    <div class="bk-row"><button class="btn" id="bkPlay" disabled>▶ 伴奏を再生</button></div>
+    <label class="chk"><input type="checkbox" id="bkAuto" checked> 録画を始めると、伴奏も最初から流す</label>
+    <label class="f" for="bkVol">録画に重ねる伴奏の大きさ <span id="bkVolV">80%</span></label>
+    <input type="range" class="bk" id="bkVol" min="0" max="150" value="80">
+    <label class="f" for="bkLat">タイミング補正 <span id="bkLatV">0ミリ秒</span></label>
+    <input type="range" class="bk" id="bkLat" min="0" max="400" step="10" value="0">
+    <p class="note" style="margin-top:.4em">ワイヤレスイヤホンでは、伴奏が少し遅れて聞こえます。録画を見て、ドラムが伴奏より遅れているときは右へ動かしてください。有線イヤホン(延長ケーブル)なら0のままで大丈夫です。</p>
+    <h3 class="tsec">自然の演出</h3>
+    <label class="chk"><input type="checkbox" id="natReset" checked> 録画を始めると、自然の演出を最初(芽)から始める</label>
+    <p class="note" style="margin-top:.2em">録画前の試し叩きで木が育っていても、動画は芽吹きから始まります。何回かに分けて撮り、続きから育てたいときはオフにしてください。</p>
     <div id="drums"></div>
     <label class="f" for="gateIn">まわりの音を無視する強さ</label>
     <input type="range" id="gateIn" min="6" max="30" value="14" style="width:100%">
     <p class="note" style="margin-top:.4em">叩いていないのに光るときは右へ動かしてください。</p>
     <p style="margin-top:1.2em;display:flex;flex-wrap:wrap;gap:10px"><button class="btn" id="recal">環境音を測り直す</button><button class="btn" id="reset">初期値に戻す</button></p>
+    <p class="note" style="margin-top:1.4em">バージョン 2.1.0</p>
   </aside>
-  <div id="msg" role="alert"></div>
-  <div id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT">
-    <div class="card"><h3 id="dlgT"></h3><p id="dlgP"></p><div class="prog" id="dlgProg" hidden><i></i></div><div class="actions" id="dlgA"></div></div>
-  </div>
 </div>
 
 <div class="bar">
@@ -157,18 +205,29 @@ button,.btn,select{font:inherit;color:var(--ink)}
       <button data-g="pop">ポップス</button>
       <button data-g="rock">ロック</button>
       <button data-g="fusion">フュージョン</button>
+      <button data-g="yokai">百鬼夜行</button>
+      <button data-g="nature">自然</button>
     </div>
     <button class="btn rec" id="recBtn" disabled><span class="dot"></span><span id="recTxt">録画</span></button>
     <button class="btn" id="flipBtn" disabled>カメラ切替</button>
+    <button class="btn" id="bkBar" disabled>♪ 伴奏</button>
     <button class="btn" id="mirBtn" aria-pressed="true">左右反転</button>
+    <button class="btn" id="fitBtn" aria-pressed="false">画面いっぱい</button>
+    <button class="btn" id="fsBtn" hidden>全画面</button>
     <span class="spacer"></span>
     <span class="status" id="status">未接続</span>
     <button class="btn" id="tuneBtn" aria-expanded="false" aria-controls="tune">調整</button>
   </div>
 </div>
 
+<div id="msg" role="alert"></div>
+<div id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="card"><h3 id="dlgT"></h3><p id="dlgP"></p><div class="prog" id="dlgProg" hidden><i></i></div><div class="actions" id="dlgA"></div></div>
+</div>
+
 <script>
 'use strict';
+const APP_VERSION = '2.1.0';
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d');
 const PI2 = Math.PI * 2;
@@ -189,7 +248,7 @@ const DRUMS = [
   { id:'ride',  name:'ライド',     color:'#5fd8ff', thr:9,  refr:120, pos:[.84,.30], key:'k' },
 ];
 const DMAP = Object.fromEntries(DRUMS.map(d => [d.id, d]));
-const GNAME = { pop:'ポップス', rock:'ロック', fusion:'フュージョン' };
+const GNAME = { pop:'ポップス', rock:'ロック', fusion:'フュージョン', yokai:'百鬼夜行', nature:'自然' };
 const NOTE = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 // ---- 状態 ----
@@ -200,6 +259,7 @@ let rec = null, recChunks = [], recStart = 0, recPeak = 0;
 const fx = [], ps = [];
 const st = {};
 DRUMS.forEach(d => st[d.id] = { E:-120, hist:[], ring:new Float32Array(300), ri:0, rn:0, floor:-90, calFloor:null, last:0, rise:0, above:0, lamp:0, armed:true, peak:-120 });
+var natResetOn = true;   // 録画開始で自然の演出を最初から
 let gateDb = 14, calibUntil = 0, calPending = false, inputNode = null, frameNo = 0;
 const bandAn = {}, bandBuf = {};
 let pitch = { f:110, pc:9, n:6, name:'A2', on:false }, loud = 0;
@@ -211,9 +271,12 @@ try {
   const s = JSON.parse(localStorage.getItem('drumviz') || '{}');
   if (s.sens) Object.assign(sens, s.sens);
   if (s.gate) gateDb = s.gate;
+  if (typeof s.bkVol === 'number') bkVol = s.bkVol;
+  if (typeof s.bkLat === 'number') bkLat = s.bkLat;
+  if (typeof s.natReset === 'boolean') natResetOn = s.natReset;
   if (s.genre in GNAME) genre = s.genre;
 } catch (e) {}
-function save() { try { localStorage.setItem('drumviz', JSON.stringify({ sens, genre, gate:gateDb })); } catch (e) {} }
+function save() { try { localStorage.setItem('drumviz', JSON.stringify({ sens, genre, gate:gateDb, bkVol, bkLat, natReset:natResetOn })); } catch (e) {} }
 
 // ---- UI 構築 ----
 const strip = {}, rows = {};
@@ -234,8 +297,11 @@ $('#reset').onclick = () => { DRUMS.forEach(d => { sens[d.id] = 50; rows[d.id].i
 $('#gateIn').value = gateDb;
 $('#gateIn').addEventListener('input', () => { gateDb = +$('#gateIn').value; save(); });
 $('#recal').onclick = () => startCalib();
+$('#natReset').checked = natResetOn;
+$('#natReset').addEventListener('change', () => { natResetOn = $('#natReset').checked; save(); });
 
 function setGenre(g, announce) {
+  if (g === 'nature' && genre !== 'nature') resetNature();   // 自然を選ぶたびに、木は芽から育て直す
   genre = g; save();
   document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === g));
   if (announce && !reduceMotion) {
@@ -249,19 +315,20 @@ $('#mirBtn').onclick = () => { mirror = !mirror; $('#mirBtn').setAttribute('aria
 $('#tuneBtn').onclick = () => {
   const open = $('#tune').classList.toggle('open');
   $('#tuneBtn').setAttribute('aria-expanded', open);
+  showUI();
 };
 $('#homeBtn').onclick = () => goHome();
 $('#recBtn').onclick = () => { if (ac && ac.state !== 'running') ac.resume(); rec ? stopRec() : startRec(); };
 $('#goLive').onclick = () => startLive();
 $('#goFile').onclick = () => { ensureAudio(); $('#fileIn').click(); };
+$('#goAudio').onclick = () => { ensureAudio(); $('#audioIn').click(); };
+$('#audioIn').onchange = e => { const f = e.target.files[0]; if (f) startAudio(f); e.target.value = ''; };
 $('#flipBtn').onclick = () => {
   const sel = $('#camSel');
   if (sel.options.length < 2) { showMsg('切り替えられるカメラがありません。'); return; }
   sel.selectedIndex = (sel.selectedIndex + 1) % sel.options.length;
   startLive();
 };
-if (matchMedia('(pointer: coarse)').matches)
-  $('#hint').textContent = 'ドラムがなくても、「調整」パネルのドラム名をタップすると各エフェクトを試せます。';
 
 // ---- 動画のドラッグ&ドロップ(Macの写真アプリ・Finderから)----
 let dragDepth = 0;
@@ -271,6 +338,9 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => {
   e.preventDefault(); dragDepth = 0; $('#stage').classList.remove('drop');
   const files = [...(e.dataTransfer ? e.dataTransfer.files : [])];
+  const band = files.find(isBandFile), au = files.find(isAudioFile);
+  if (band) { bandHelp(band); return; }
+  if (au && !files.some(f => /^video\//.test(f.type))) { ensureAudio(); startAudio(au); return; }
   const f = files.find(f => /^video\//.test(f.type) || /\.(mov|mp4|m4v|webm|avi|mkv)$/i.test(f.name));
   if (f) { ensureAudio(); startFile(f); }
   else if (files.length) showMsg('動画ファイルをドロップしてください。');
@@ -279,6 +349,17 @@ window.addEventListener('drop', e => {
     '写真アプリで動画を選び、「ファイル」→「書き出す」→「1本のビデオを書き出す」でデスクトップなどに保存してから、そのファイルをこの画面にドラッグしてください。',
     [{ label:'閉じる', primary:true }]);
 });
+
+// ---- 端末に合わせて案内を出し分ける ----
+// マウスやトラックパッドがある端末(パソコン、キーボード付きiPad)はキーボードの案内、
+// タッチ操作の端末(iPhone・iPad)はタップの案内。キーが押されたら、キーボードの案内も出す
+(function () {
+  const fine = matchMedia('(any-pointer: fine)').matches;
+  const touch = matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  if (fine || !touch) document.body.classList.add('has-key');
+  if (touch) document.body.classList.add('has-touch');
+  window.addEventListener('keydown', () => document.body.classList.add('has-key'), { once:true });
+})();
 
 // ---- ダイアログ ----
 function dialog(title, text, buttons) {
@@ -305,8 +386,59 @@ document.addEventListener('pointerdown', () => { if (ac && ac.state !== 'running
 $('#fileIn').onchange = e => { const f = e.target.files[0]; if (f) startFile(f); e.target.value = ''; };
 $('#camSel').onchange = () => { if (mode === 'live') startLive(); };
 $('#micSel').onchange = () => { if (mode === 'live') startLive(); };
+// ---- 操作バーの自動非表示(演奏中は映像を最大に見せる)----
+let uiTimer = 0, tapRevealed = false, hintShown = false;
+const uiBusy = () => !mode || $('#tune').classList.contains('open') || !$('#dlg').hidden;
+function showUI() {
+  document.body.classList.remove('ui-hidden');
+  clearTimeout(uiTimer);
+  uiTimer = setTimeout(() => {
+    if (uiBusy() || document.querySelector('.bar:hover')) { showUI(); return; }
+    document.body.classList.add('ui-hidden');
+    if (!hintShown) {   // 最初の1回だけ、出し方を案内する
+      hintShown = true; $('#uiHint').classList.add('show');
+      setTimeout(() => $('#uiHint').classList.remove('show'), 3500);
+    }
+  }, 3000);
+}
+window.addEventListener('pointerdown', () => { tapRevealed = document.body.classList.contains('ui-hidden'); showUI(); }, true);
+['pointermove', 'keydown', 'wheel'].forEach(ev => window.addEventListener(ev, showUI, { passive:true, capture:true }));
+
+// 操作バーの高さを測り、初期画面や調整パネルの下に同じだけ余白を作る
+const barEl = document.querySelector('.bar');
+const setBarH = () => document.documentElement.style.setProperty('--barH', barEl.getBoundingClientRect().height + 'px');
+setBarH();
+if (window.ResizeObserver) new ResizeObserver(setBarH).observe(barEl); else window.addEventListener('resize', setBarH);
+
+// ---- 画面いっぱい(映像の端を少し切って画面全体に広げる)----
+let fill = false;
+try { fill = !!JSON.parse(localStorage.getItem('drumviz-fill') || 'false'); } catch (e) {}
+function setFill(on) {
+  fill = on; cv.classList.toggle('fill', on);
+  $('#fitBtn').setAttribute('aria-pressed', on); $('#fitBtn').textContent = on ? '全体を表示' : '画面いっぱい';
+  try { localStorage.setItem('drumviz-fill', JSON.stringify(on)); } catch (e) {}
+}
+setFill(fill);
+$('#fitBtn').onclick = () => setFill(!fill);
+
+// ---- 全画面(対応しているブラウザだけボタンを出す。iPhoneは「ホーム画面に追加」で全画面に近くなる)----
+const fsEl = document.documentElement;
+const fsReq = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+if (fsReq && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
+  $('#fsBtn').hidden = false;
+  $('#fsBtn').onclick = () => {
+    const on = document.fullscreenElement || document.webkitFullscreenElement;
+    try { on ? fsExit.call(document) : fsReq.call(fsEl); } catch (e) {}
+  };
+  const upd = () => { $('#fsBtn').textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '全画面を終了' : '全画面'; };
+  document.addEventListener('fullscreenchange', upd); document.addEventListener('webkitfullscreenchange', upd);
+}
+
 $('#stage').addEventListener('click', e => {
+  if (tapRevealed) { tapRevealed = false; return; }   // 隠れていたバーを出すためのタップでは一時停止しない
   if (mode === 'file' && e.target === cv && video) video.paused ? video.play() : video.pause();
+  if (mode === 'audio' && e.target === cv && audioEl) audioEl.paused ? audioEl.play() : audioEl.pause();
 });
 
 document.addEventListener('keydown', e => {
@@ -317,10 +449,34 @@ document.addEventListener('keydown', e => {
   if (k === '1') setGenre('pop', true);
   if (k === '2') setGenre('rock', true);
   if (k === '3') setGenre('fusion', true);
+  if (k === '4') setGenre('yokai', true);
+  if (k === '5') setGenre('nature', true);
   if (k === 'r' && !$('#recBtn').disabled) $('#recBtn').click();
 });
 
-function showMsg(t) { const m = $('#msg'); m.textContent = t; m.classList.add('show'); clearTimeout(showMsg.t); showMsg.t = setTimeout(() => m.classList.remove('show'), 7000); }
+// カメラ・マイクが許可されていないときの案内(ボタン付き)
+function camHelp() {
+  const inClaude = !!(window.claude && window.claude.use);
+  const touch = matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  dialog('カメラとマイクが使えません',
+    (inClaude ? 'claude.ai のページでは、カメラとマイクが使えない場合があります。GitHub Pagesなどに置いたアプリか、ダウンロードしたファイルで開いてください。\n\n' : '') +
+    'カメラかマイクの使用が許可されていません。次の手順で許可してから、「もう一度試す」を押してください。\n\n' +
+    (touch
+      ? '■ iPhone・iPad\n「設定」アプリ →「アプリ」→「Safari」(古いiOSは「設定」→「Safari」)の「カメラ」と「マイク」を「確認」か「許可」にします。設定を変えたら、このページを読み込み直してください。'
+      : '■ パソコン\nアドレスバーの左側(またはSafariの「設定」→「Webサイト」)で、カメラとマイクを「許可」にします。'),
+    [
+      { label:'もう一度試す', primary:true, onClick:() => startLive() },
+      { label:'演奏動画ファイルで試す', onClick:() => { ensureAudio(); $('#fileIn').click(); } },
+      { label:'閉じる' },
+    ]);
+}
+function showMsg(t) {
+  const m = $('#msg'); m.textContent = t;
+  const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', '閉じる');
+  x.onclick = () => m.classList.remove('show'); m.appendChild(x);
+  m.classList.add('show'); clearTimeout(showMsg.t);
+  showMsg.t = setTimeout(() => m.classList.remove('show'), Math.max(7000, t.length * 120));
+}
 
 // ---- 入力 ----
 async function ensureAudio() {
@@ -341,10 +497,13 @@ async function ensureAudio() {
 }
 
 function stopSource() {
+  bkStop();
   if (rec) stopRec();
   if (srcNode) { try { if (srcNode.stop) srcNode.stop(); } catch (e) {} try { srcNode.disconnect(); } catch (e) {} srcNode = null; }
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   if (video) { video.pause(); if (video.src && video.src.startsWith('blob:')) URL.revokeObjectURL(video.src); video.remove(); video = null; }
+  if (audioEl) { audioEl.pause(); if (audioEl.src.startsWith('blob:')) URL.revokeObjectURL(audioEl.src); audioEl.remove(); audioEl = null; }
+  audioName = '';
 }
 
 function sizeCanvas() {
@@ -376,6 +535,9 @@ async function startLive() {
     if (ac.state !== 'running') await ac.resume().catch(() => {});
     srcNode = ac.createMediaStreamSource(stream);
     srcNode.connect(inputNode); srcNode.connect(recDest);   // スピーカーには出さない(ハウリング防止)
+    const micLabel = (stream.getAudioTracks()[0] || {}).label || '';
+    if (/airpods|bluetooth|headset|beats|buds|hands-?free|ハンズフリー/i.test(micLabel))
+      showMsg(`マイクがワイヤレスイヤホンのマイク(${micLabel})になっています。ドラムの音がきれいに入らないので、「調整」のマイクでiPhoneのマイクを選んでください。`);
     const fm = (stream.getVideoTracks()[0].getSettings() || {}).facingMode;   // 前面カメラのときだけ鏡像にする
     mode = 'live'; mirror = fm ? fm === 'user' : true; $('#mirBtn').setAttribute('aria-pressed', mirror);
     await listDevices();
@@ -383,8 +545,7 @@ async function startLive() {
     onStarted('カメラ・マイク');
   } catch (e) {
     const n = e && e.name;
-    if (n === 'NotAllowedError' && window.claude && window.claude.use) showMsg('claude.ai のページでは、カメラとマイクが使えない場合があります。ダウンロードしたファイル(Mac)か、Netlifyなどに置いたアプリ(iPhone・iPad)を使ってください。');
-    else if (n === 'NotAllowedError') showMsg('カメラかマイクの使用が許可されていません。もう一度「カメラとマイクで始める」を押し、確認が出たら「許可」を選んでください。');
+    if (n === 'NotAllowedError') { camHelp(); return; }
     else if (n === 'NotFoundError' || n === 'OverconstrainedError') showMsg('カメラかマイクが見つかりません。接続を確かめるか、調整パネルで別の機器を選んでください。');
     else if (n === 'NotReadableError') showMsg('カメラかマイクがほかのアプリで使用中です。ほかのアプリを閉じてから試してください。');
     else showMsg('開始できませんでした:' + (e && e.message ? e.message : e));
@@ -514,27 +675,105 @@ function fileFailed(file, why, afterRetry) {
 }
 
 // 楽譜モグラと同じ方式:映像を読めない動画から音声だけを取り出して再生する
-async function playAudioOnly(file) {
+async function playAudioOnly(file, label) {
   stopSource();
   await ensureAudio();
   if (ac.state !== 'running') ac.resume();
   dialog('音声を読み込んでいます', file.name, []);
   try {
-    const data = await file.arrayBuffer();
-    const buf = await new Promise((res, rej) => {
-      const p = ac.decodeAudioData(data, res, rej);
-      if (p && p.then) p.then(res, rej);
-    });
+    const buf = await decodeAnyAudio(file);
     const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
     src.connect(inputNode); src.connect(recDest); src.connect(ac.destination);
     srcNode = src; video = null;
-    mode = 'file'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false); $('#flipBtn').disabled = true;
+    mode = label ? 'audio' : 'file'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false); $('#flipBtn').disabled = true;
+    audioName = label ? file.name : '';
     closeDlg();
-    onStarted('音声のみ(映像を読めない形式のため)');
+    onStarted(label || '音声のみ(映像を読めない形式のため)');
     src.start();
   } catch (e) {
-    dialog('音声も読み込めませんでした', `「${file.name}」\nQuickTime PlayerでH.264形式に書き出してから読み込んでください。`, [{ label:'閉じる', primary:true }]);
+    dialog('音声を読み込めませんでした', `「${file.name}」\n` + (label
+      ? 'この形式はブラウザで再生できません。GarageBandなどで、MP3・AAC(m4a)・WAVのどれかに書き出してから読み込んでください。'
+      : 'QuickTime PlayerでH.264形式に書き出してから読み込んでください。'), [{ label:'閉じる', primary:true }]);
   }
+}
+
+// ================= 音声ファイル(GarageBandで書き出した曲など)=================
+let audioEl = null, audioName = '';
+const isBandFile = f => /\.band$/i.test(f.name);
+const isAudioFile = f => /^audio\//.test(f.type) || /\.(mp3|m4a|aac|wav|wave|aif|aiff|aifc|caf|qta|ogg|oga|flac)$/i.test(f.name);
+// GarageBandのプロジェクト(.band)はGarageBand専用の形式なので、書き出し方を案内する
+function bandHelp(file) {
+  dialog('GarageBandのプロジェクトは、そのままでは再生できません',
+    `「${file.name}」はGarageBandでしか開けないプロジェクトファイルです。GarageBandで曲を音声ファイルに書き出してから読み込んでください。\n\n` +
+    '■ Macの場合\nGarageBandで曲を開き、メニューの「共有」→「曲をディスクに書き出す」を選びます。形式は「AAC」「MP3」「WAVE」のどれかにしてください。\n\n' +
+    '■ iPhone・iPadの場合\n「マイソング」(曲の一覧)で曲を長押し →「共有」→「曲」を選び、音質を選んで「共有」→「"ファイル"に保存」で保存します。\n\n' +
+    'ちなみに、入試の作品提出でも、DAWのプロジェクトファイルは受け付けられず、音声ファイルでの提出が必要です。',
+    [{ label:'閉じる', primary:true }]);
+}
+async function startAudio(file) {
+  if (isBandFile(file)) { bandHelp(file); return; }
+  await ensureAudio();
+  stopSource();
+  const a = document.createElement('audio');
+  a.loop = true; a.preload = 'auto'; a.style.display = 'none'; $('#stage').appendChild(a);
+  let fellBack = false;
+  const fallback = () => {   // <audio>で読めない形式(ChromeのAIFFなど)は、中身を読み取って再生する
+    if (fellBack || audioEl !== a) return; fellBack = true;
+    stopSource(); playAudioOnly(file, '音声ファイル');
+  };
+  a.addEventListener('error', fallback);
+  a.src = URL.createObjectURL(file);
+  audioEl = a; audioName = file.name;
+  srcNode = ac.createMediaElementSource(a);
+  srcNode.connect(inputNode); srcNode.connect(recDest); srcNode.connect(ac.destination);
+  video = null; mode = 'audio'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false); $('#flipBtn').disabled = true;
+  onStarted('音声ファイル(画面クリックで一時停止)');
+  dialog('音声ファイルを選びました', file.name + '\n再生に合わせて、音を聴き分けてエフェクトを出します。録画すると、エフェクトの映像と音がいっしょに保存されます。', [
+    { label:'再生してスタート', primary:true, onClick:() => {
+      if (ac.state !== 'running') ac.resume();
+      const p = a.play(); if (p && p.catch) p.catch(err => { if (err && err.name === 'NotSupportedError') fallback(); });
+    } },
+  ]);
+}
+// どの形式でも読めるよう、ブラウザの読み取り→だめならAIFFを自前で読み取る
+async function decodeAnyAudio(file) {
+  const data = await file.arrayBuffer();
+  try {
+    return await new Promise((res, rej) => { const p = ac.decodeAudioData(data.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
+  } catch (e) {
+    return parseAiff(data);
+  }
+}
+function parseAiff(buf) {
+  const dv = new DataView(buf), id = o => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+  if (buf.byteLength < 12 || id(0) !== 'FORM') throw new Error('not aiff');
+  const form = id(8); if (form !== 'AIFF' && form !== 'AIFC') throw new Error('not aiff');
+  let p = 12, ch = 0, frames = 0, bits = 0, rate = 0, le = false, ssnd = -1, ssndLen = 0;
+  while (p + 8 <= buf.byteLength) {
+    const cid = id(p), len = dv.getUint32(p + 4), d = p + 8;
+    if (cid === 'COMM') {
+      ch = dv.getInt16(d); frames = dv.getUint32(d + 2); bits = dv.getInt16(d + 6);
+      const ex = dv.getUint16(d + 8) & 0x7fff, hi = dv.getUint32(d + 10), lo = dv.getUint32(d + 14);
+      rate = (hi * 4294967296 + lo) * Math.pow(2, ex - 16383 - 63);
+      if (form === 'AIFC') { const c = id(d + 18); if (c === 'sowt') le = true; else if (c !== 'NONE' && c !== 'twos') throw new Error('compressed aifc'); }
+    } else if (cid === 'SSND') { const off = dv.getUint32(d); ssnd = d + 8 + off; ssndLen = len - 8 - off; }
+    p = d + len + (len & 1);
+  }
+  if (ssnd < 0 || !ch || !rate) throw new Error('bad aiff');
+  const bps = Math.ceil(bits / 8), n = Math.min(frames, Math.floor(ssndLen / (bps * ch)));
+  const ab = ac.createBuffer(ch, n, Math.round(rate)), chans = [];
+  for (let c = 0; c < ch; c++) chans.push(ab.getChannelData(c));
+  const max = Math.pow(2, bps * 8 - 1);
+  let o = ssnd;
+  for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) {
+    let v;
+    if (bps === 1) v = dv.getInt8(o);
+    else if (bps === 2) v = dv.getInt16(o, le);
+    else if (bps === 3) v = le ? (dv.getUint8(o) | dv.getUint8(o + 1) << 8 | dv.getInt8(o + 2) << 16) : (dv.getInt8(o) << 16 | dv.getUint8(o + 1) << 8 | dv.getUint8(o + 2));
+    else v = dv.getInt32(o, le);
+    chans[c][i] = v / max; o += bps;
+  }
+  return ab;
 }
 
 function loadScript(src) {
@@ -610,6 +849,8 @@ async function listDevices() {
 
 // 最初の画面に戻る:カメラ・マイク・動画を止め、録画中なら録画を終えて保存画面を出す
 function goHome() {
+  setTimeout(updateBkUi, 0);
+  resetNature();
   stopSource();
   mode = null; fx.length = 0; ps.length = 0; shake = 0;
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -619,9 +860,12 @@ function goHome() {
   $('#tune').classList.remove('open'); $('#tuneBtn').setAttribute('aria-expanded', false);
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   $('#goLive').focus();
+  showUI();
 }
 
 function onStarted(label) {
+  setTimeout(updateBkUi, 0);
+  setTimeout(showUI, 0);
   $('#homeBtn').disabled = false;
   keepAwake();
   startCalib();
@@ -736,6 +980,8 @@ function trigger(id, v) {
   const W = cv.width, H = cv.height, m = Math.min(W, H);
   const x = d.pos[0] * W, y = d.pos[1] * H, c = d.color, g = genre, n = pitch.n;
   const addShake = a => { if (!reduceMotion) shake = Math.max(shake, a); };
+  if (g === 'yokai') { spawnYokai(id, v, x, y, c, m, now); return; }
+  if (g === 'nature') { spawnNature(id, v, x, y, m, now); return; }
 
   if (id === 'kick') {   // 赤い衝撃波
     if (g === 'pop') {
@@ -922,6 +1168,8 @@ function drawFx(f, now) {
       });
       break;
     }
+    case 'yokai': drawYokai(f, age); break;
+    case 'bolt': case 'rain': case 'wave': case 'sun': drawNatureFx(f, age, a); break;
     case 'flash': { ctx.fillStyle = rgba(f.c, f.a * Math.pow(1 - a, 2)); ctx.fillRect(0, 0, cv.width, cv.height); break; }
     case 'rays': {
       const L = f.L * easeOut(a), al = 1 - a; ctx.lineCap = 'round';
@@ -969,10 +1217,667 @@ function drawFx(f, now) {
   return true;
 }
 
+// ================= 百鬼夜行 =================
+// 叩いた楽器ごとに妖怪が現れ、行列になって画面の左へ歩いていく。絵はすべてこのアプリのための手描き(図形)
+const YOKAI = {
+  kick:  { name:'鬼',         lane:.80 },
+  snare: { name:'唐傘お化け', lane:.78 },
+  hihat: { name:'鬼火',       lane:.34 },
+  htom:  { name:'河童',       lane:.80 },
+  ltom:  { name:'提灯お化け', lane:.60 },
+  ftom:  { name:'ろくろ首',   lane:.76 },
+  crash: { name:'狐',         lane:.82 },
+  ride:  { name:'一反木綿',   lane:.30 },
+};
+function spawnYokai(id, v, x, y, c, m, now) {
+  fx.push({ k:'burst', x, y, c, t0:now, life:500, R:m * .12 * v, soft:true });   // 現れる瞬間の光
+  const n = id === 'hihat' ? 3 : 1;
+  for (let i = 0; i < n; i++) {
+    fx.push({ k:'yokai', type:id, c, t0:now + i * 90, life:4600,
+      x0:x + rnd(-1, 1) * m * .03, y0:y, ly:YOKAI[id].lane * cv.height + rnd(-1, 1) * m * .03,
+      vx:-m * rnd(.15, .22), s:m * .17 * clamp(v, .7, 1.4) * (id === 'hihat' ? .5 : 1), seed:Math.random() * 10 });
+  }
+  // 出すぎたら古い妖怪から帰ってもらう
+  let cnt = 0;
+  for (let i = fx.length - 1; i >= 0; i--) if (fx[i].k === 'yokai' && ++cnt > 40) fx.splice(i, 1);
+}
+function yEye(x, y, r) {
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, r, 0, PI2); ctx.fill();
+  ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.arc(x - r * .3, y, r * .52, 0, PI2); ctx.fill();
+}
+function shade(hex, k) {   // 色を明るく(k>0)/暗く(k<0)
+  const v = parseInt(hex.slice(1), 16); let r = v >> 16 & 255, g = v >> 8 & 255, b = v & 255;
+  const f = c => Math.round(k > 0 ? c + (255 - c) * k : c * (1 + k));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function legs(t, col, y, gap) {   // 歩く足
+  const w = Math.sin(t * 9) * 6;
+  ctx.fillStyle = col;
+  ctx.fillRect(-gap - 5 + w, y, 10, 16); ctx.fillRect(gap - 5 - w, y, 10, 16);
+}
+function drawYokai(f, age) {
+  const t = age / 1000, a = age / f.life;
+  const pop = age < 260 ? 1 + .25 * Math.sin(age / 260 * Math.PI) : 1;   // ぽんっと現れる
+  const grow = Math.min(1, age / 180);
+  const alpha = a > .82 ? (1 - a) / .18 : 1;
+  const x = f.x0 + f.vx * t;
+  const y = f.y0 + (f.ly - f.y0) * easeOut(Math.min(1, age / 700));
+  const u = f.s / 100 * grow * pop;
+  if (u <= 0) return;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(u, u); ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const c = f.c, ph = t + f.seed;
+  // 背中の淡い光(妖気)
+  ctx.globalCompositeOperation = 'lighter';
+  const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, 70);
+  aura.addColorStop(0, rgba(c, .28)); aura.addColorStop(1, rgba(c, 0));
+  ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(0, 0, 70, 0, PI2); ctx.fill();
+  ctx.globalCompositeOperation = f.type === 'hihat' ? 'lighter' : 'source-over';
+
+  switch (f.type) {
+    case 'kick': {   // 鬼
+      ctx.translate(0, -Math.abs(Math.sin(ph * 9)) * 4);
+      legs(ph, shade(c, -.25), 38, 12);
+      ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, 18, 30, 26, 0, 0, PI2); ctx.fill();
+      ctx.fillStyle = '#f2c94c'; ctx.fillRect(-28, 26, 56, 12);   // 虎柄の腰巻
+      ctx.fillStyle = '#2a1a05'; for (let i = -22; i < 28; i += 12) ctx.fillRect(i, 26, 4, 12);
+      ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, -20, 25, 23, 0, 0, PI2); ctx.fill();
+      ctx.fillStyle = '#f5ead0';   // 角
+      ctx.beginPath(); ctx.moveTo(-16, -36); ctx.lineTo(-22, -58); ctx.lineTo(-6, -41); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(16, -36); ctx.lineTo(22, -58); ctx.lineTo(6, -41); ctx.fill();
+      ctx.fillStyle = '#1d1d1d'; ctx.beginPath(); ctx.ellipse(0, -42, 16, 6, 0, Math.PI, PI2); ctx.fill();   // 髪
+      yEye(-9, -22, 6); yEye(9, -22, 6);
+      ctx.fillStyle = '#3a0d0a'; ctx.beginPath(); ctx.ellipse(0, -8, 11, 6, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(-7, -8); ctx.lineTo(-3, -8); ctx.lineTo(-5, -2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(3, -8); ctx.lineTo(7, -8); ctx.lineTo(5, -2); ctx.fill();
+      ctx.save(); ctx.translate(30, 10); ctx.rotate(-.5 + Math.sin(ph * 9) * .15);   // 金棒
+      ctx.fillStyle = '#4b4f5a'; ctx.fillRect(-4, -46, 9, 52);
+      ctx.fillStyle = '#9aa1ad'; for (let i = -42; i < 0; i += 9) { ctx.fillRect(-7, i, 3, 3); ctx.fillRect(6, i + 4, 3, 3); }
+      ctx.restore();
+      break;
+    }
+    case 'snare': {   // 唐傘お化け
+      ctx.translate(0, -Math.abs(Math.sin(ph * 6)) * 22);
+      ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 40); ctx.stroke();
+      ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.ellipse(0, 43, 8, 4, 0, 0, PI2); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(-46, 4); ctx.quadraticCurveTo(0, -78, 46, 4);
+      ctx.quadraticCurveTo(0, -6, -46, 4); ctx.fill();
+      ctx.strokeStyle = shade(c, -.35); ctx.lineWidth = 1.6;
+      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(0, -36); ctx.lineTo(i * 15, 0 - Math.abs(i) * -1); ctx.stroke(); }
+      yEye(-2, -18, 10);
+      ctx.fillStyle = '#ff5f7e'; ctx.beginPath(); ctx.moveTo(-6, -4); ctx.quadraticCurveTo(-10, 16, -2, 20);
+      ctx.quadraticCurveTo(4, 14, 2, -4); ctx.fill();
+      break;
+    }
+    case 'hihat': {   // 鬼火
+      const fl = 1 + Math.sin(ph * 14) * .08;
+      ctx.translate(Math.sin(ph * 3) * 8, Math.sin(ph * 4) * 10);
+      ctx.scale(fl, 2 - fl);
+      const g = ctx.createRadialGradient(0, 4, 0, 0, 0, 34);
+      g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.45, rgba('#bfe8ff', .7)); g.addColorStop(1, rgba('#7fb4ff', 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(0, -36); ctx.bezierCurveTo(22, -6, 18, 22, 0, 24); ctx.bezierCurveTo(-18, 22, -22, -6, 0, -36); ctx.fill();
+      break;
+    }
+    case 'htom': {   // 河童
+      ctx.translate(0, -Math.abs(Math.sin(ph * 9)) * 4);
+      legs(ph, shade(c, -.3), 36, 10);
+      ctx.fillStyle = shade(c, -.35); ctx.beginPath(); ctx.ellipse(14, 14, 15, 22, 0, 0, PI2); ctx.fill();   // 甲羅
+      ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, 18, 24, 24, 0, 0, PI2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -18, 23, 0, PI2); ctx.fill();
+      ctx.fillStyle = '#163d22';   // 髪
+      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 7 - 4, -34); ctx.lineTo(i * 7, -44); ctx.lineTo(i * 7 + 4, -34); ctx.fill(); }
+      ctx.fillStyle = '#e8f6ff'; ctx.beginPath(); ctx.ellipse(0, -40, 13, 5, 0, 0, PI2); ctx.fill();   // 皿
+      yEye(-11, -22, 6); yEye(6, -22, 6);
+      ctx.fillStyle = '#f2b81c'; ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-6, -14); ctx.lineTo(-6, -2); ctx.fill();   // くちばし
+      break;
+    }
+    case 'ltom': {   // 提灯お化け
+      ctx.translate(0, Math.sin(ph * 3) * 8);
+      ctx.globalCompositeOperation = 'lighter';
+      const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, 60);
+      gl.addColorStop(0, rgba(c, .5)); gl.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, 60, 0, PI2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#fff1b8'; ctx.beginPath(); ctx.ellipse(0, 0, 30, 40, 0, 0, PI2); ctx.fill();
+      ctx.strokeStyle = shade(c, -.45); ctx.lineWidth = 1.6;
+      for (let i = -30; i <= 30; i += 10) { const w = 30 * Math.sqrt(1 - (i / 40) ** 2); ctx.beginPath(); ctx.moveTo(-w, i); ctx.quadraticCurveTo(0, i + 4, w, i); ctx.stroke(); }
+      ctx.fillStyle = '#1d1d1d'; ctx.fillRect(-15, -46, 30, 9); ctx.fillRect(-15, 37, 30, 9);
+      yEye(-10, -12, 8);
+      ctx.strokeStyle = '#1d1d1d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(4, -12); ctx.lineTo(16, -14); ctx.stroke();
+      ctx.fillStyle = '#3a1a10'; ctx.beginPath(); ctx.ellipse(0, 12, 18, 7, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#ff5f7e'; ctx.beginPath(); ctx.moveTo(-8, 13); ctx.quadraticCurveTo(-6, 34 + Math.sin(ph * 8) * 3, 2, 30); ctx.quadraticCurveTo(4, 20, 2, 13); ctx.fill();
+      break;
+    }
+    case 'ftom': {   // ろくろ首
+      const hx = Math.sin(ph * 2.2) * 18, hy = -70 + Math.sin(ph * 3.1) * 8;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(-26, 52); ctx.lineTo(26, 52); ctx.lineTo(10, 14); ctx.lineTo(-10, 14); ctx.fill();   // 着物
+      ctx.strokeStyle = '#f3dccb'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(0, 16);
+      ctx.bezierCurveTo(28 * Math.sin(ph * 3), -10, -28 * Math.sin(ph * 2.6), -40, hx, hy + 12); ctx.stroke();
+      ctx.fillStyle = '#f6e3d3'; ctx.beginPath(); ctx.ellipse(hx, hy, 15, 17, 0, 0, PI2); ctx.fill();
+      ctx.fillStyle = '#151515';
+      ctx.beginPath(); ctx.ellipse(hx, hy - 8, 17, 12, 0, Math.PI, PI2); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx + 2, hy - 22, 8, 0, PI2); ctx.fill();   // まげ
+      ctx.fillRect(hx - 17, hy - 9, 5, 18); ctx.fillRect(hx + 12, hy - 9, 5, 18);
+      ctx.strokeStyle = '#151515'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx - 3, hy - 1); ctx.moveTo(hx + 3, hy - 1); ctx.lineTo(hx + 9, hy); ctx.stroke();
+      ctx.fillStyle = '#d23a4a'; ctx.beginPath(); ctx.arc(hx - 1, hy + 8, 2.2, 0, PI2); ctx.fill();
+      break;
+    }
+    case 'crash': {   // 狐
+      ctx.translate(0, -Math.abs(Math.sin(ph * 10)) * 5);
+      const lc = shade(c, -.2);
+      ctx.fillStyle = lc;
+      const w = Math.sin(ph * 10) * 7;
+      ctx.fillRect(-18 + w, 16, 7, 18); ctx.fillRect(-6 - w, 16, 7, 18); ctx.fillRect(16 + w, 16, 7, 18); ctx.fillRect(26 - w, 16, 7, 18);
+      ctx.fillStyle = c;   // しっぽ
+      ctx.beginPath(); ctx.moveTo(28, 6); ctx.bezierCurveTo(60, 0, 62, -40, 44 + Math.sin(ph * 5) * 6, -48); ctx.bezierCurveTo(46, -20, 36, -8, 26, -4); ctx.fill();
+      ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.arc(44 + Math.sin(ph * 5) * 6, -44, 7, 0, PI2); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(6, 8, 28, 14, 0, 0, PI2); ctx.fill();   // 胴
+      ctx.beginPath(); ctx.moveTo(-44, -10); ctx.lineTo(-14, -26); ctx.lineTo(-6, -2); ctx.lineTo(-24, 2); ctx.fill();   // 顔
+      ctx.beginPath(); ctx.moveTo(-24, -20); ctx.lineTo(-20, -40); ctx.lineTo(-12, -24); ctx.fill();   // 耳
+      ctx.beginPath(); ctx.moveTo(-12, -24); ctx.lineTo(-4, -40); ctx.lineTo(-4, -18); ctx.fill();
+      ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.moveTo(-44, -10); ctx.lineTo(-24, -4); ctx.lineTo(-24, 2); ctx.fill();
+      ctx.strokeStyle = '#2a1a05'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-26, -16); ctx.lineTo(-18, -18); ctx.stroke();   // 細い目
+      ctx.fillStyle = '#2a1a05'; ctx.beginPath(); ctx.arc(-44, -10, 2.5, 0, PI2); ctx.fill();
+      break;
+    }
+    case 'ride': {   // 一反木綿
+      ctx.translate(0, Math.sin(ph * 2) * 10);
+      const pts = [];
+      for (let i = 0; i <= 24; i++) { const xx = -20 + i * 6; pts.push([xx, Math.sin(xx * .05 - ph * 6) * (4 + i * .5)]); }
+      ctx.fillStyle = '#f2fbff'; ctx.strokeStyle = c; ctx.lineWidth = 2;
+      ctx.beginPath();
+      pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py - 8) : ctx.moveTo(px, py - 8));
+      for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], pts[i][1] + 8);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      yEye(-12, pts[0][1] - 1, 3.5); yEye(-3, pts[1][1] - 1, 3.5);
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// ================= 自然 =================
+// 楽器ごとに自然の現象を見せる。演奏するほど、画面の左で一本の木が育っていく
+var treeGrow = 0, tree = null, wind = 0, lastWindT = 0;
+var natStage = 'grow', season = 0, regrowK = 0;   // grow:最初の成長 / cycle:季節がめぐる / regrow:春にまた芽吹く
+const WIND_EFFECT = false;   // 風に揺られる演出は一旦お休み(戻すときは true にする)
+function spawnNature(id, v, x, y, m, now) {
+  advanceNature(id, v);
+  if (WIND_EFFECT && id === 'htom') wind = Math.min(2, wind + .6 * v);   // 木の葉を運ぶ風
+  if (WIND_EFFECT && id === 'ftom') wind = Math.min(2, wind + .4 * v);   // うねる波と一緒に吹く風
+  switch (id) {
+    case 'kick': {   // 稲妻
+      const pts = []; let px = x + rnd(-1, 1) * m * .15;
+      pts.push([px, 0]);
+      for (let i = 1; i <= 10; i++) { px += (x - px) / (11 - i) + rnd(-1, 1) * m * .035; pts.push([px, y * i / 10]); }
+      pts[pts.length - 1] = [x, y];
+      const br = [];
+      for (let k = 0; k < 2; k++) {
+        let [bx, by] = pts[3 + Math.floor(rnd(0, 5))]; const b = [[bx, by]];
+        for (let i = 0; i < 4; i++) { bx += rnd(-1, 1) * m * .04 + (k ? 1 : -1) * m * .03; by += m * .05; b.push([bx, by]); }
+        br.push(b);
+      }
+      fx.push({ k:'bolt', pts, br, t0:now, life:420, w:m * .006 * v });
+      fx.push({ k:'flash', c:'#dfe8ff', t0:now, life:300, a:.22 * v });
+      if (!reduceMotion) shake = Math.max(shake, m * .012 * v);
+      break;
+    }
+    case 'snare':   // 雨粒と水面の波紋
+      fx.push({ k:'rain', x, y, t0:now, life:1100, R:m * .18 * v, fall:m * .3, c:'#bfe3ff' });
+      for (let i = 0; i < 2; i++) fx.push({ k:'rain', x:x + rnd(-1, 1) * m * .12, y:y + rnd(-1, 1) * m * .05, t0:now + 80 + i * 90, life:900, R:m * .08, fall:m * .25, c:'#bfe3ff' });
+      break;
+    case 'hihat':   // 桜の花びら
+      for (let i = 0; i < 8; i++) ps.push({ s:'petal', x:x + rnd(-1, 1) * m * .05, y:y + rnd(-1, 1) * m * .04, vx:rnd(-1, 1) * m * .15, vy:rnd(-.25, .05) * m,
+        g:m * .12, drag:.4, sway:m * .6, sf:rnd(2, 4), sp:rnd(0, 6), life:rnd(1.8, 2.8), age:0, size:m * rnd(.008, .014) * v, rot:rnd(0, PI2), spin:rnd(-3, 3), c:'#ffc0d3' });
+      break;
+    case 'htom':   // 風に舞う木の葉
+      for (let i = 0; i < 6; i++) ps.push({ s:'leaf', x:x + rnd(-1, 1) * m * .05, y:y + rnd(-1, 1) * m * .05, vx:-m * rnd(.3, .6), vy:rnd(-.2, .1) * m,
+        g:m * .1, drag:.5, sway:m * .8, sf:rnd(1.5, 3), sp:rnd(0, 6), life:rnd(2, 2.8), age:0, size:m * rnd(.015, .024) * v, rot:rnd(0, PI2), spin:rnd(-4, 4), c:'#5fbf4a' });
+      break;
+    case 'ltom':   // 蛍
+      for (let i = 0; i < 10; i++) ps.push({ s:'firefly', x:x + rnd(-1, 1) * m * .08, y:y + rnd(-1, 1) * m * .06, vx:rnd(-1, 1) * m * .05, vy:rnd(-1, 1) * m * .05,
+        wander:m * 1.2, drag:.3, life:rnd(2, 3.2), age:0, size:m * rnd(.006, .01), sp:rnd(0, 6), c:'#e8ff6a' });
+      break;
+    case 'ftom':   // うねる波
+      fx.push({ k:'wave', x, y, t0:now, life:1600, amp:m * .06 * v, c1:'#4f8bff', c2:'#a35bff' });
+      break;
+    case 'crash':   // 朝日
+      fx.push({ k:'sun', x, y, t0:now, life:1700, R:m * .14 * v, m });
+      break;
+    case 'ride':   // 雪の結晶
+      for (let i = 0; i < 5; i++) ps.push({ s:'snow', x:x + rnd(-1, 1) * m * .1, y:y + rnd(-1, 1) * m * .06, vx:rnd(-1, 1) * m * .05, vy:m * rnd(.05, .12),
+        sway:m * .2, sf:rnd(1, 2), sp:rnd(0, 6), life:rnd(2.5, 3.5), age:0, size:m * rnd(.02, .035) * v, rot:rnd(0, PI2), spin:rnd(-.8, .8), c:'#cfefff' });
+      break;
+  }
+}
+
+function drawNatureFx(f, age, a) {
+  switch (f.k) {
+    case 'bolt': {
+      const al = Math.pow(1 - a, 1.5) * (a < .3 && Math.random() < .3 ? .4 : 1);
+      const line = pts => { ctx.beginPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke(); };
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = `rgba(150,180,255,${al * .35})`; ctx.lineWidth = f.w * 5; line(f.pts); f.br.forEach(b => line(b));
+      ctx.strokeStyle = `rgba(255,255,255,${al})`; ctx.lineWidth = f.w; line(f.pts);
+      ctx.lineWidth = f.w * .6; f.br.forEach(b => line(b));
+      break;
+    }
+    case 'rain': {
+      const ff = Math.min(1, age / 180);
+      if (ff < 1) {
+        const yy = f.y - f.fall * (1 - ff);
+        ctx.strokeStyle = rgba(f.c, .9); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x, yy - f.fall * .25); ctx.lineTo(f.x, yy); ctx.stroke();
+      }
+      for (let j = 0; j < 3; j++) {
+        const aj = (age - 180 - j * 140) / (f.life - 180); if (aj <= 0 || aj >= 1) continue;
+        const rx = f.R * easeOut(aj) * (1 + j * .2);
+        ctx.strokeStyle = rgba(f.c, (1 - aj) * .9); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(f.x, f.y, Math.max(1, rx), Math.max(1, rx * .32), 0, 0, PI2); ctx.stroke();
+      }
+      break;
+    }
+    case 'wave': {
+      const W = cv.width, cx = f.x + (a - .3) * W * .5;
+      for (let k = 0; k < 3; k++) {
+        const g = ctx.createLinearGradient(0, 0, W, 0);
+        g.addColorStop(0, rgba(f.c1, (1 - a) * (.8 - k * .2))); g.addColorStop(1, rgba(f.c2, (1 - a) * (.8 - k * .2)));
+        ctx.strokeStyle = g; ctx.lineWidth = 3 - k * .6;
+        ctx.beginPath();
+        for (let X = 0; X <= W; X += 12) {
+          const env = Math.exp(-Math.pow((X - cx) / (W * .28), 2));
+          const Y = f.y + k * f.amp * .45 + Math.sin(X * .012 + age * .006 + k) * f.amp * (1 - a * .6) * env;
+          X ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+        }
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'sun': {
+      const env = Math.sin(Math.PI * Math.min(1, a * 1.4)) * Math.pow(1 - a, .5);
+      const cy = f.y - f.m * .05 * a, R = f.R;
+      const glow = ctx.createRadialGradient(f.x, cy, 0, f.x, cy, R * 4.5);
+      glow.addColorStop(0, `rgba(255,190,80,${.45 * env})`); glow.addColorStop(1, 'rgba(255,190,80,0)');
+      ctx.fillStyle = glow; circlePath(f.x, cy, R * 4.5); ctx.fill();
+      ctx.save(); ctx.translate(f.x, cy); ctx.rotate(age * .0003);
+      ctx.fillStyle = `rgba(255,214,120,${.22 * env})`;
+      for (let i = 0; i < 12; i++) {
+        ctx.rotate(PI2 / 12);
+        const L = R * (2.3 + .4 * Math.sin(age * .004 + i));
+        ctx.beginPath(); ctx.moveTo(-R * .18, -R * 1.1); ctx.lineTo(0, -L); ctx.lineTo(R * .18, -R * 1.1); ctx.fill();
+      }
+      ctx.restore();
+      const disc = ctx.createRadialGradient(f.x, cy, 0, f.x, cy, R);
+      disc.addColorStop(0, `rgba(255,255,240,${env})`); disc.addColorStop(.6, `rgba(255,200,90,${env * .9})`); disc.addColorStop(1, 'rgba(255,170,60,0)');
+      ctx.fillStyle = disc; circlePath(f.x, cy, R); ctx.fill();
+      break;
+    }
+  }
+}
+
+// 空の色(音の勢いで夜明け→昼へ)と、演奏で育つ木
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function buildTree() {
+  const W = cv.width, H = cv.height, m = Math.min(W, H), rng = mulberry(11), segs = [];
+  const q = [{ x:W * .1, y:H, a:-Math.PI / 2, len:m * .14, w:m * .022, d:0 }];
+  while (q.length && segs.length < 260) {
+    const b = q.shift();
+    const x2 = b.x + Math.cos(b.a) * b.len, y2 = b.y + Math.sin(b.a) * b.len;
+    segs.push({ x1:b.x, y1:b.y, x2, y2, w:b.w, d:b.d, k:rng() });
+    if (b.d < 6) {
+      const n = b.d < 1 ? 2 : (rng() < .5 ? 2 : 3);
+      for (let i = 0; i < n; i++) q.push({ x:x2, y:y2, a:b.a + (rng() - .5) * .9 + (i - (n - 1) / 2) * .5, len:b.len * (.72 + rng() * .12), w:Math.max(1, b.w * .68), d:b.d + 1 });
+    }
+  }
+  const tips = segs.filter(sg => sg.d >= 4);
+  const cx = tips.reduce((a, sg) => a + sg.x2, 0) / tips.length, cy = tips.reduce((a, sg) => a + sg.y2, 0) / tips.length;
+  const r = Math.max(...tips.map(sg => Math.hypot(sg.x2 - cx, sg.y2 - cy))) * .8;
+  tree = { segs, W, H, cx, cy, r, tips };
+}
+function drawNatureBg(now) {
+  const wdt = Math.min(.05, (now - (lastWindT || now)) / 1000); lastWindT = now;
+  wind *= Math.pow(.35, wdt);   // 突風は少しずつおさまる
+  const W = cv.width, H = cv.height, e = clamp(loud / 10, 0, 1);
+  ctx.globalCompositeOperation = 'source-over';
+  const sky = ctx.createLinearGradient(0, 0, 0, H * .55);
+  sky.addColorStop(0, `rgba(${Math.round(90 + 165 * e)},${Math.round(110 + 70 * e)},${Math.round(200 - 90 * e)},${.16 + .1 * e})`);
+  sky.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * .55);
+  const ground = ctx.createLinearGradient(0, H * .75, 0, H);
+  ground.addColorStop(0, 'rgba(40,120,60,0)'); ground.addColorStop(1, 'rgba(40,120,60,.2)');
+  ctx.fillStyle = ground; ctx.fillRect(0, H * .75, W, H * .25);
+  if (treeGrow > 0) {   // 季節の空の色
+    const tc = seasonTint(), tint = ctx.createLinearGradient(0, 0, 0, H * .6);
+    tint.addColorStop(0, `rgba(${tc[0]},${tc[1]},${tc[2]},.14)`); tint.addColorStop(1, `rgba(${tc[0]},${tc[1]},${tc[2]},0)`);
+    ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H * .6);
+    seasonFall(wdt);
+  }
+  if (treeGrow > 0) {
+    if (!tree || tree.W !== W || tree.H !== H) buildTree();
+    const sv = seasonVals();
+    const n = treeGrow * tree.segs.length, sway = WIND_EFFECT ? Math.sin(now * .0012 * (1 + wind * .5)) * (.6 + wind * 2.5) : 0;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < n && i < tree.segs.length; i++) {
+      const sg = tree.segs[i], part = Math.min(1, n - i);
+      const x2 = sg.x1 + (sg.x2 - sg.x1) * part + sway * sg.d, y2 = sg.y1 + (sg.y2 - sg.y1) * part;
+      ctx.strokeStyle = 'rgba(82,54,32,.92)'; ctx.lineWidth = sg.w;
+      ctx.beginPath(); ctx.moveTo(sg.x1 + sway * Math.max(0, sg.d - 1), sg.y1); ctx.lineTo(x2, y2); ctx.stroke();
+      const flat = Math.abs(sg.x2 - sg.x1) / Math.max(1, Math.hypot(sg.x2 - sg.x1, sg.y2 - sg.y1));   // 横向きの枝ほど雪が積もる
+      if (sv.snow > 0 && sg.d >= 1 && flat > .25) {   // 枝に積もる雪
+        ctx.strokeStyle = `rgba(255,255,255,${.9 * sv.snow})`; ctx.lineWidth = Math.max(1, sg.w * .5 * flat);
+        ctx.beginPath(); ctx.moveTo(sg.x1, sg.y1 - sg.w * .45); ctx.lineTo(x2, y2 - sg.w * .45); ctx.stroke();
+      }
+      if (sg.d >= 4 && part >= 1) {   // 葉と花(季節で変わる)
+        const bloom = isBloom(sg) && sv.blossom > sg.k / .45 * .95;   // 花は1輪ずつ散っていく
+        if (bloom) {
+          ctx.fillStyle = 'rgba(255,182,206,.95)'; ctx.beginPath(); ctx.arc(x2, y2, sg.w * 3.2, 0, PI2); ctx.fill();
+        } else if (sv.leafAmt > sg.k * .95) {   // 葉も1枚ずつ落ちる/芽吹く
+          const gr = [70 + sg.k * 50, 150 + sg.k * 50, 70];
+          const au = sg.k < .33 ? [205, 60, 40] : sg.k < .66 ? [232, 128, 40] : [238, 200, 60];
+          const c = gr.map((g0, j) => Math.round(g0 + (au[j] - g0) * sv.leafCol));
+          const sz = natStage === 'regrow' ? clamp((sv.leafAmt - sg.k * .95) / .15, .2, 1) : 1;
+          ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},.9)`; ctx.beginPath(); ctx.arc(x2, y2, sg.w * 2.6 * sz, 0, PI2); ctx.fill();
+        }
+      }
+    }
+  }
+  drawField(now);
+  const snowNow = seasonVals().snow;
+  if (treeGrow > 0 && snowNow > 0) {   // 地面に積もる雪
+    const m = Math.min(W, H);
+    ctx.fillStyle = 'rgba(245,250,255,.92)'; ctx.beginPath(); ctx.moveTo(0, H);
+    for (let X = 0; X <= W; X += 16) ctx.lineTo(X, H - m * .04 * snowNow * (1 + .35 * Math.sin(X * .02)));
+    ctx.lineTo(W, H); ctx.fill();
+  }
+  // updateCreatures(now);   // 鳥と蝶の演出は一旦お休み(戻すときはこの行を有効にする)
+  ctx.globalCompositeOperation = 'lighter';
+}
+
+const BUTTERFLY_COLORS = ['#ffd34d', '#5fc8ff', '#ff8ac8', '#ff9f43'];
+// 蝶:羽を開いたり閉じたりしながら飛ぶ(進む向きに体を向ける)
+function drawButterfly(x, y, z, col, t, al, ang) {
+  if (al <= 0) return;
+  const flap = .25 + .75 * Math.abs(Math.sin(t * 14));
+  ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = clamp(al, 0, 1);
+  ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.scale(flap, 1);
+  ctx.fillStyle = col; ctx.strokeStyle = 'rgba(40,30,20,.6)'; ctx.lineWidth = Math.max(.8, z * .06);
+  for (const sx of [-1, 1]) {
+    ctx.beginPath(); ctx.ellipse(sx * z * .55, -z * .25, z * .55, z * .42, sx * .5, 0, PI2); ctx.fill(); ctx.stroke();   // 前の羽
+    ctx.beginPath(); ctx.ellipse(sx * z * .4, z * .3, z * .38, z * .3, -sx * .4, 0, PI2); ctx.fill(); ctx.stroke();   // 後ろの羽
+  }
+  ctx.fillStyle = 'rgba(30,24,18,.75)';   // 羽の斑点
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * z * .7, -z * .35, z * .13, 0, PI2); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.8)';
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * z * .45, z * .32, z * .08, 0, PI2); ctx.fill(); }
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha = clamp(al, 0, 1); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2);
+  ctx.strokeStyle = '#2b2118'; ctx.lineWidth = Math.max(1.2, z * .14); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -z * .5); ctx.lineTo(0, z * .55); ctx.stroke();   // 胴
+  ctx.lineWidth = Math.max(.8, z * .05);
+  ctx.beginPath(); ctx.moveTo(0, -z * .5); ctx.lineTo(-z * .25, -z * .85); ctx.moveTo(0, -z * .5); ctx.lineTo(z * .25, -z * .85); ctx.stroke();   // 触角
+  ctx.restore();
+}
+// ================= 枝に止まる鳥と、花に止まる蝶 =================
+// 鳥:木が育つと、ときどき1〜2羽が飛んできて枝に止まる。クラッシュ(朝日)で飛び立つ
+// 蝶:花が咲くと飛んできて花に止まり、しばらく羽を休めてから飛んでいく
+const creatures = [];
+let lastCrT = 0, nextBirdAt = 0, nextButterAt = 0, field = null;
+const isBloom = sg => sg.d >= 4 && sg.k < .45 && fieldGrow() > .6 + sg.k * .7;
+const FLOWER_COLORS = ['#ff8ac8', '#ffd34d', '#ffffff', '#b98cff', '#ff9f43', '#ff6b7a'];
+
+// ================= 季節がめぐる =================
+// 最初の成長で満開になったあとも、叩くたびに季節が進む。
+// 春(満開)→ 夏(木の花が散る)→ 秋(葉が色づいて落ち、お花畑が枯れる)→ 冬(雪)→ 春(また芽吹く)→ …
+function resetNature() {
+  treeGrow = 0; natStage = 'grow'; season = 0; regrowK = 0;
+  if (field) field.fl.forEach(f => f.bloomT = 0);
+}
+function fieldGrow() { return natStage === 'grow' ? treeGrow : natStage === 'regrow' ? regrowK : 1; }
+function seasonVals() {
+  if (natStage === 'grow') return { blossom:1, leafCol:0, leafAmt:1, wilt:0, snow:0 };
+  if (natStage === 'regrow') return { blossom:1, leafCol:0, leafAmt:regrowK, wilt:0, snow:0 };
+  const s = season;
+  return {
+    blossom:s < 1 ? 1 : 1 - clamp((s - 1) / .4, 0, 1),
+    leafCol:clamp((s - 2) / .5, 0, 1),
+    leafAmt:s < 2.5 ? 1 : 1 - clamp((s - 2.5) / .5, 0, 1),
+    wilt:clamp((s - 2.2) / .6, 0, 1),
+    snow:s < 3 ? 0 : s < 3.75 ? clamp((s - 3) / .4, 0, 1) : 1 - clamp((s - 3.75) / .25, 0, 1),
+  };
+}
+function seasonTint() {
+  const C4 = [[255, 200, 225], [120, 190, 255], [255, 160, 80], [210, 225, 255]];
+  if (natStage !== 'cycle') return C4[0];
+  const i = Math.floor(season) % 4, j = (i + 1) % 4, k = clamp((season - Math.floor(season) - .7) / .3, 0, 1);
+  return C4[i].map((v, n) => Math.round(v + (C4[j][n] - v) * k));
+}
+function announceSeason(t) {
+  if (reduceMotion) return;
+  const el = $('#flash'); el.textContent = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+function advanceNature(id, v) {
+  const k = (id === 'kick' ? 2 : 1) * v;
+  if (natStage === 'grow') {
+    treeGrow = Math.min(1, treeGrow + .004 * k);
+    if (treeGrow >= 1) { natStage = 'cycle'; season = 0; announceSeason('満開'); }
+  } else if (natStage === 'cycle') {
+    const before = Math.floor(season);
+    season += .012 * k;
+    if (season >= 4) {   // 冬が終わり、また春
+      natStage = 'regrow'; regrowK = 0; season = 0;
+      if (field) field.fl.forEach(f => f.bloomT = 0);
+      announceSeason('春');
+    } else if (Math.floor(season) !== before) announceSeason(['春', '夏', '秋', '冬'][Math.floor(season)]);
+  } else {
+    regrowK = Math.min(1, regrowK + .008 * k);
+    if (regrowK >= 1) { natStage = 'cycle'; season = 0; announceSeason('満開'); }
+  }
+}
+// 季節ごとに舞い落ちるもの(夏:木の花びら、秋:色づいた葉と枯れた花びら、冬:雪)
+function seasonFall(dt) {
+  if (natStage !== 'cycle' || !tree || !tree.tips.length) return;
+  const W = cv.width, H = cv.height, m = Math.min(W, H), s = season;
+  const tip = () => tree.tips[Math.floor(rnd(0, tree.tips.length))];
+  if (s >= 1 && s < 1.45 && Math.random() < 22 * dt) {
+    const t = tip();
+    ps.push({ s:'petal', x:t.x2, y:t.y2, vx:rnd(-1, 1) * m * .05, vy:m * .02, g:m * .06, drag:.5, sway:m * .3, sf:rnd(2, 4), sp:rnd(0, 6),
+      life:rnd(2.5, 3.5), age:0, size:m * rnd(.006, .01), rot:rnd(0, PI2), spin:rnd(-3, 3), c:'#ffc0d3' });
+  }
+  if (s >= 2.45 && s < 3 && Math.random() < 14 * dt) {
+    const t = tip(), cols = ['#cd3c28', '#e88028', '#eec83c'];
+    ps.push({ s:'leaf', x:t.x2, y:t.y2, vx:rnd(-1, 1) * m * .06, vy:m * .02, g:m * .07, drag:.5, sway:m * .35, sf:rnd(1.5, 3), sp:rnd(0, 6),
+      life:rnd(3, 4), age:0, size:m * rnd(.012, .018), rot:rnd(0, PI2), spin:rnd(-3, 3), c:cols[Math.floor(rnd(0, 3))] });
+  }
+  if (s >= 2.2 && s < 2.8 && field && Math.random() < 6 * dt) {   // 枯れていくお花畑の花びら
+    const f = field.fl[Math.floor(rnd(0, field.fl.length))], [hx, hy] = flowerHead(f, performance.now());
+    ps.push({ s:'petal', x:hx, y:hy, vx:rnd(-1, 1) * m * .04, vy:m * .01, g:m * .05, drag:.5, sway:m * .2, sf:rnd(2, 4), sp:rnd(0, 6),
+      life:rnd(1.5, 2.2), age:0, size:m * rnd(.005, .008), rot:rnd(0, PI2), spin:rnd(-3, 3), c:f.col });
+  }
+  if (s >= 3 && s < 3.8 && Math.random() < 20 * dt) {
+    ps.push({ s:'snow', x:rnd(0, W), y:-m * .02, vx:rnd(-1, 1) * m * .02, vy:m * rnd(.06, .1), sway:m * .08, sf:rnd(1, 2), sp:rnd(0, 6),
+      life:rnd(6, 9), age:0, size:m * rnd(.008, .014), rot:rnd(0, PI2), spin:rnd(-.6, .6), c:'#eaf6ff' });
+  }
+}
+
+// ---- お花畑:演奏が進むと、画面の下に花が芽を出し、次々に咲いていく ----
+function buildField() {
+  const W = cv.width, H = cv.height, m = Math.min(W, H), rng = mulberry(23), fl = [];
+  const count = Math.max(16, Math.round(W / (m * .055)));
+  for (let i = 0; i < count; i++) {
+    fl.push({ x:(i + rng() * .8) / count * W, by:H - rng() * m * .05, h:m * (.05 + rng() * .08), th:.12 + rng() * .78,
+      col:FLOWER_COLORS[Math.floor(rng() * FLOWER_COLORS.length)], z:m * (.012 + rng() * .01), pet:rng() < .5 ? 5 : 6, ph:rng() * 6 });
+  }
+  fl.sort((a, b) => a.by - b.by);   // 奥の花から描く
+  field = { fl, W, H };
+}
+function flowerState(f) {
+  const g = clamp((fieldGrow() - f.th + .12) / .12, 0, 1), w = seasonVals().wilt;
+  return { stem:Math.min(1, g * 2) * (1 - w * .6), bloom:clamp((g - .5) * 2, 0, 1) * (1 - w), wilt:w };
+}
+function flowerSway(f, now) {
+  if (!WIND_EFFECT) return 0;
+  const st = flowerState(f);
+  return f.h * st.stem * (.07 + wind * .2) * Math.sin(now * .0018 * (1 + wind * .6) - f.x * .006 + f.ph * .3);
+}
+function flowerHead(f, now) {
+  const st = flowerState(f), sw = flowerSway(f, now);
+  return [f.x + sw, f.by - f.h * st.stem + Math.abs(sw) * .3];   // 大きくしなると、花の位置も少し下がる
+}
+function drawField(now) {
+  if (!field || field.W !== cv.width || field.H !== cv.height) buildField();
+  if (treeGrow <= 0) { field.fl.forEach(f => f.bloomT = 0); return; }
+  for (const f of field.fl) {
+    const st = flowerState(f); if (st.stem <= 0 || st.wilt >= .95) continue;
+    const [hx, hy] = flowerHead(f, now);
+    const wl = st.wilt;   // 秋になると茎が茶色くなる
+    ctx.strokeStyle = `rgba(${Math.round(70 + 70 * wl)},${Math.round(150 - 60 * wl)},${Math.round(70 - 30 * wl)},.95)`; ctx.lineWidth = Math.max(1.5, f.z * .22); ctx.lineCap = 'round';
+    const sw = flowerSway(f, now), tilt = sw / Math.max(1, f.h);
+    ctx.beginPath(); ctx.moveTo(f.x, f.by); ctx.quadraticCurveTo(f.x + sw * .15, (f.by + hy) / 2, hx, hy); ctx.stroke();
+    ctx.fillStyle = 'rgba(80,165,75,.95)';   // 葉
+    ctx.beginPath(); ctx.ellipse(f.x + f.z * .6 + sw * .08, f.by - f.h * st.stem * .35, f.z * .7, f.z * .25, -.6 + tilt * .8, 0, PI2); ctx.fill();
+    if (st.bloom > 0) {   // 花びらが開いていく
+      if (st.bloom >= 1 && !f.bloomT) f.bloomT = now;   // 咲いた瞬間を覚えておく
+      if (f.bloomT && now - f.bloomT < 700) {   // 咲いた瞬間に、ふわっと光る
+        const k = (now - f.bloomT) / 700, gr = f.z * 3.2 * easeOut(k);
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, Math.max(1, gr));
+        g.addColorStop(0, rgba(f.col, .55 * (1 - k))); g.addColorStop(1, rgba(f.col, 0));
+        ctx.fillStyle = g; circlePath(hx, hy, gr); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      const r = f.z * (st.bloom < 1 ? st.bloom * (1 + .25 * Math.sin(st.bloom * Math.PI)) : 1);   // ぽんっと開く
+      ctx.fillStyle = f.col;
+      for (let k = 0; k < f.pet; k++) {
+        const a = k / f.pet * PI2 + f.ph + tilt * .6;
+        ctx.beginPath(); ctx.ellipse(hx + Math.cos(a) * r * .7, hy + Math.sin(a) * r * .7, r * .55, r * .38, a, 0, PI2); ctx.fill();
+      }
+      ctx.fillStyle = f.col === '#ffd34d' ? '#8a4b16' : '#ffd34d';
+      ctx.beginPath(); ctx.arc(hx, hy, r * .35, 0, PI2); ctx.fill();
+    } else if (st.wilt > 0) {   // 枯れた花
+      ctx.fillStyle = 'rgba(120,80,40,.9)'; ctx.beginPath(); ctx.arc(hx, hy, f.z * .3, 0, PI2); ctx.fill();
+    } else {   // つぼみ
+      ctx.fillStyle = 'rgba(90,170,80,.95)'; ctx.beginPath(); ctx.ellipse(hx, hy, f.z * .25, f.z * .4, 0, 0, PI2); ctx.fill();
+    }
+  }
+}
+function bloomedFlowers() { return field ? field.fl.map((f, i) => flowerState(f).bloom >= 1 ? i : -1).filter(i => i >= 0) : []; }
+
+// ---- 枝に止まる鳥 ----
+function grownCount() { return tree ? Math.floor(treeGrow * tree.segs.length) : 0; }
+function perchPoint(c) {
+  const sg = tree && tree.segs[c.seg]; if (!sg) return null;
+  return [sg.x1 + (sg.x2 - sg.x1) * .65, sg.y1 + (sg.y2 - sg.y1) * .65 - c.z * .35];
+}
+function takeOff(c, now) {   // 空へ飛んでいく
+  c.state = 'leave'; c.t0 = now;
+  c.vx = (Math.random() < .5 ? -1 : 1) * c.z * rnd(4, 7); c.vy = -c.z * rnd(8, 11);
+}
+function birdsTakeOff(now) {
+  creatures.forEach(c => { if (c.type === 'bird' && c.state !== 'leave') takeOff(c, now); });
+  nextBirdAt = now + 5000;
+}
+function edgeStart(W, H, low) {
+  const r = Math.random();
+  if (low) return [r < .5 ? -W * .05 : W * 1.05, rnd(.55, .8) * H];   // お花畑の高さから入ってくる
+  return r < .4 ? [-W * .05, rnd(.05, .4) * H] : r < .8 ? [W * 1.05, rnd(.05, .4) * H] : [rnd(.1, .9) * W, -H * .05];
+}
+function updateCreatures(now) {
+  const W = cv.width, H = cv.height, m = Math.min(W, H);
+  const dt = Math.min(.05, (now - (lastCrT || now)) / 1000); lastCrT = now;
+  if (!tree || treeGrow <= 0) { creatures.length = 0; return; }
+  const n = grownCount();
+
+  // 鳥:木が育つと、ときどき飛んできて枝に止まる(最大2羽)
+  const maxBirds = treeGrow > .7 ? 2 : treeGrow > .3 ? 1 : 0;
+  if (creatures.filter(c => c.type === 'bird' && c.state !== 'leave').length < maxBirds && now > nextBirdAt) {
+    const cands = []; for (let i = 0; i < n; i++) { const sg = tree.segs[i]; if (sg.d >= 2 && sg.d <= 4 && !creatures.some(c => c.type === 'bird' && c.seg === i)) cands.push(i); }
+    if (cands.length) {
+      const [sx, sy] = edgeStart(W, H, false);
+      creatures.push({ type:'bird', state:'come', t0:now, sx, sy, seg:cands[Math.floor(rnd(0, cands.length))], z:m * .032, col:'#4a7bd6', dir:1, ph:rnd(0, 6), rest:rnd(4000, 7000) });
+    }
+    nextBirdAt = now + rnd(4000, 8000);
+  }
+  // 蝶:花が咲くと飛んできて、お花畑の花から花へ飛び交う(咲いた花が多いほど増える。最大4匹)
+  const blooms = bloomedFlowers();
+  const maxBut = blooms.length > 12 ? 4 : blooms.length > 6 ? 3 : blooms.length > 2 ? 2 : blooms.length ? 1 : 0;
+  if (creatures.filter(c => c.type === 'butterfly' && c.state !== 'leave').length < maxBut && now > nextButterAt) {
+    const [sx, sy] = edgeStart(W, H, true);
+    creatures.push({ type:'butterfly', state:'come', t0:now, sx, sy, fi:blooms[Math.floor(rnd(0, blooms.length))], z:m * .03,
+      col:BUTTERFLY_COLORS[Math.floor(rnd(0, BUTTERFLY_COLORS.length))],
+      ph:rnd(0, 6), visits:0, maxVisits:3 + Math.floor(rnd(0, 3)), rest:rnd(1500, 3000), dur:0 });
+    nextButterAt = now + rnd(2000, 4000);
+  }
+
+  for (let i = creatures.length - 1; i >= 0; i--) {
+    const c = creatures[i], age = now - c.t0, bird = c.type === 'bird';
+    const tp = bird ? perchPoint(c) : (field && field.fl[c.fi] ? flowerHead(field.fl[c.fi], now) : null);
+    if (!tp && c.state !== 'leave') { takeOff(c, now); continue; }
+    let x, y, flying = true, ang = 0;
+    if (c.state === 'come') {   // 止まる場所へ飛んでいく
+      if (!c.dur) c.dur = bird ? 1800 : clamp(Math.hypot(tp[0] - c.sx, tp[1] - c.sy) / (m * .35) * 1000, 900, 2600);
+      const k = Math.min(1, age / c.dur), e = easeOut(k);
+      x = c.sx + (tp[0] - c.sx) * e; y = c.sy + (tp[1] - c.sy) * e - Math.sin(k * Math.PI) * m * (bird ? .06 : .07);
+      if (!bird) { x += Math.sin(age * .007 + c.ph) * m * .025 * (1 - k); y += Math.cos(age * .009 + c.ph) * m * .018 * (1 - k); }
+      c.dir = tp[0] >= c.sx ? 1 : -1; ang = Math.atan2(tp[1] - c.sy, tp[0] - c.sx);
+      if (k >= 1) { c.state = 'perch'; c.t0 = now; }
+    } else if (c.state === 'perch') {   // 止まって休む
+      [x, y] = tp; flying = false;
+      if (age > c.rest) {
+        if (bird) takeOff(c, now);
+        else if (++c.visits >= c.maxVisits || bloomedFlowers().length < 2) takeOff(c, now);
+        else {   // 近くの別の花へ
+          const bl = bloomedFlowers().filter(k => k !== c.fi);
+          bl.sort((a, b) => Math.abs(field.fl[a].x - field.fl[c.fi].x) - Math.abs(field.fl[b].x - field.fl[c.fi].x));
+          c.fi = bl[Math.floor(rnd(0, Math.min(4, bl.length)))]; c.state = 'come'; c.t0 = now; c.sx = x; c.sy = y; c.dur = 0; c.rest = rnd(1500, 3000);
+        }
+      }
+    } else {   // 空へ飛んでいく
+      c.lx = (c.lx ?? c.px ?? c.sx) + c.vx * dt; c.ly = (c.ly ?? c.py ?? c.sy) + c.vy * dt;
+      if (!bird) c.lx += Math.sin(age * .006 + c.ph) * c.z * 20 * dt;
+      x = c.lx; y = c.ly; c.dir = Math.sign(c.vx) || 1; ang = Math.atan2(c.vy, c.vx);
+      if (age > 5000 || x < -W * .1 || x > W * 1.1 || y < -H * .1) { creatures.splice(i, 1); continue; }
+    }
+    if (c.state !== 'leave') { c.lx = undefined; c.ly = undefined; }
+    c.px = x; c.py = y;
+    if (bird) drawSmallBird(x, y, c.z, c.col, now / 1000 + c.ph, c.dir, flying);
+    else drawButterfly(x, y, c.z, c.col, flying ? now / 1000 + c.ph : (now / 1000 + c.ph) * .18, 1, flying ? ang : -Math.PI / 2);
+  }
+}
+// 小鳥(青い羽と白いおなか)。止まっているときは翼をたたみ、ときどき首をかしげる
+function drawSmallBird(x, y, z, col, t, dir, flying) {
+  ctx.save(); ctx.globalCompositeOperation = 'source-over';
+  ctx.translate(x, y); ctx.scale(dir, 1);
+  if (!flying) ctx.rotate(Math.sin(t * 1.3) > .85 ? -.15 : 0);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(-z * .55, z * .05); ctx.lineTo(-z * 1.05, -z * .1); ctx.lineTo(-z * .95, z * .25); ctx.fill();   // 尾
+  ctx.beginPath(); ctx.ellipse(0, 0, z * .6, z * .42, flying ? 0 : -.15, 0, PI2); ctx.fill();   // 胴
+  ctx.fillStyle = '#f4f1e8'; ctx.beginPath(); ctx.ellipse(z * .12, z * .16, z * .38, z * .22, 0, 0, PI2); ctx.fill();   // おなか
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(z * .5, -z * .32, z * .3, 0, PI2); ctx.fill();   // 頭
+  ctx.fillStyle = '#f2a12c'; ctx.beginPath(); ctx.moveTo(z * .76, -z * .36); ctx.lineTo(z * 1.02, -z * .28); ctx.lineTo(z * .76, -z * .22); ctx.fill();   // くちばし
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(z * .58, -z * .38, z * .06, 0, PI2); ctx.fill();   // 目
+  ctx.fillStyle = shade(col, -.3);
+  if (flying) {   // はばたく翼
+    const w = Math.sin(t * 16);
+    ctx.beginPath(); ctx.moveTo(-z * .2, -z * .1); ctx.quadraticCurveTo(-z * .1, -z * (.3 + w * .9), z * .3, -z * (.2 + w * 1.1)); ctx.lineTo(z * .25, -z * .05); ctx.fill();
+  } else {   // たたんだ翼と、枝をつかむ足
+    ctx.beginPath(); ctx.ellipse(-z * .12, -z * .02, z * .38, z * .2, -.2, 0, PI2); ctx.fill();
+    ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = Math.max(1, z * .07);
+    ctx.beginPath(); ctx.moveTo(-z * .05, z * .38); ctx.lineTo(-z * .08, z * .55); ctx.moveTo(z * .15, z * .38); ctx.lineTo(z * .12, z * .55); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawParticle(p, dt) {
   p.age += dt; if (p.age >= p.life) return false;
   if (p.turn) { const c = Math.cos(p.turn * dt), s = Math.sin(p.turn * dt), vx = p.vx * c - p.vy * s; p.vy = p.vx * s + p.vy * c; p.vx = vx; }
   if (p.g) p.vy += p.g * dt;
+  if (p.sway) p.vx += Math.sin(p.age * p.sf + p.sp) * p.sway * dt;   // 風に揺られる
+  if (p.wander) { p.vx += rnd(-1, 1) * p.wander * dt; p.vy += rnd(-1, 1) * p.wander * dt; }   // ふらふら飛ぶ
   if (p.drag) { const k = Math.pow(p.drag, dt); p.vx *= k; p.vy *= k; }
   p.x += p.vx * dt; p.y += p.vy * dt;
   const a = p.age / p.life, al = 1 - a;
@@ -984,6 +1889,37 @@ function drawParticle(p, dt) {
       const r = p.size * (1 + a * .5), gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
       gr.addColorStop(0, rgba(p.c, al * .55)); gr.addColorStop(.6, rgba(p.c, al * .25)); gr.addColorStop(1, rgba(p.c, 0));
       ctx.fillStyle = gr; circlePath(p.x, p.y, r); ctx.fill(); break;
+    }
+    case 'petal': {   // 花びら(ひらひら裏返りながら舞う)
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.age * p.spin); ctx.scale(1, Math.abs(Math.cos(p.age * 3 + p.sp)) * .8 + .2);
+      ctx.fillStyle = rgba(p.c, al * .95);
+      ctx.beginPath(); ctx.moveTo(0, -p.size); ctx.quadraticCurveTo(p.size * .9, -p.size * .2, 0, p.size); ctx.quadraticCurveTo(-p.size * .9, -p.size * .2, 0, -p.size); ctx.fill();
+      ctx.restore(); break;
+    }
+    case 'leaf': {   // 木の葉
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.age * p.spin);
+      ctx.fillStyle = rgba(p.c, al); const z = p.size;
+      ctx.beginPath(); ctx.moveTo(-z, 0); ctx.quadraticCurveTo(0, -z * .6, z, 0); ctx.quadraticCurveTo(0, z * .6, -z, 0); ctx.fill();
+      ctx.strokeStyle = rgba('#2f6b22', al); ctx.lineWidth = Math.max(1, z * .08); ctx.beginPath(); ctx.moveTo(-z * 1.15, 0); ctx.lineTo(z * .8, 0); ctx.stroke();
+      ctx.restore(); break;
+    }
+    case 'firefly': {   // 蛍(明るくなったり暗くなったりする)
+      const blink = (.55 + .45 * Math.sin(p.age * 5 + p.sp)) * Math.min(1, p.age * 3) * al;
+      const r = p.size * 4, gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      gr.addColorStop(0, rgba('#ffffff', blink)); gr.addColorStop(.2, rgba(p.c, blink * .9)); gr.addColorStop(1, rgba(p.c, 0));
+      ctx.fillStyle = gr; circlePath(p.x, p.y, r); ctx.fill(); break;
+    }
+    case 'snow': {   // 雪の結晶
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.age * p.spin);
+      ctx.strokeStyle = rgba(p.c, al); ctx.lineWidth = Math.max(1.2, p.size * .08); ctx.lineCap = 'round';
+      const z = p.size;
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -z);
+        ctx.moveTo(0, -z * .55); ctx.lineTo(z * .25, -z * .78); ctx.moveTo(0, -z * .55); ctx.lineTo(-z * .25, -z * .78);
+        ctx.stroke();
+      }
+      ctx.restore(); break;
     }
     case 'sq':
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + a * 2); ctx.fillStyle = rgba(p.c, al);
@@ -1040,12 +1976,101 @@ function loop(now) {
     ctx.save(); if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, W, H); ctx.restore();
   }
   ctx.globalCompositeOperation = 'lighter';
+  if (genre === 'nature') drawNatureBg(now);
+  if (genre === 'yokai') {   // 夜の空気:全体を少し暗い紫にし、足もとに霧
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(14,8,36,.32)'; ctx.fillRect(0, 0, W, H);
+    const fog = ctx.createLinearGradient(0, H * .6, 0, H);
+    fog.addColorStop(0, 'rgba(120,90,200,0)'); fog.addColorStop(1, 'rgba(120,90,200,.22)');
+    ctx.fillStyle = fog; ctx.fillRect(0, H * .6, W, H * .4);
+    ctx.globalCompositeOperation = 'lighter';
+  }
   if (genre === 'fusion') drawMandala(now);
   for (let i = 0; i < fx.length; i++) if (!drawFx(fx[i], now)) { fx.splice(i, 1); i--; }
   for (let i = 0; i < ps.length; i++) if (!drawParticle(ps[i], dt)) { ps.splice(i, 1); i--; }
   ctx.restore();
   if (now - lastUi > 50) { updateUi(now); lastUi = now; }
 }
+
+function audioHud() {
+  const tm = t => isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '-:--';
+  return `♪ ${audioName}` + (audioEl ? ` ${tm(audioEl.currentTime)} / ${tm(audioEl.duration)}${audioEl.paused ? '(一時停止中)' : ''}` : '');
+}
+// ================= 伴奏を流しながら撮る =================
+// 伴奏は「イヤホン(本体の音の出口)」と「録画」の2か所にだけ流す。音の分析(エフェクト)には入れない。
+//   伴奏 ─┬→ イヤホン
+//          └→ タイミング補正(遅らせる)→ 大きさ → 録画
+let bkBuf = null, bkSrc = null, bkName = '', bkStart = 0, bkAuto = false, bkWarned = false;
+let bkOut = null, bkDelay = null, bkRec = null;
+var bkVol, bkLat;   // 保存した設定があればそれを使う
+if (bkVol === undefined) bkVol = .8;
+if (bkLat === undefined) bkLat = 0;
+function bkNodes() {
+  if (bkOut) return;
+  bkOut = ac.createGain(); bkOut.connect(ac.destination);
+  bkDelay = ac.createDelay(1); bkRec = ac.createGain();
+  bkDelay.connect(bkRec); bkRec.connect(recDest);
+  bkApply();
+}
+function bkApply() {
+  if (bkRec) bkRec.gain.value = bkVol;
+  if (bkDelay) bkDelay.delayTime.value = bkLat / 1000;
+  $('#bkVolV').textContent = Math.round(bkVol * 100) + '%';
+  $('#bkLatV').textContent = bkLat + 'ミリ秒';
+}
+async function bkLoad(file) {
+  if (isBandFile(file)) { bandHelp(file); return; }
+  await ensureAudio();
+  bkStop();
+  dialog('伴奏を読み込んでいます', file.name, []);
+  try {
+    bkBuf = await decodeAnyAudio(file); bkName = file.name;
+    closeDlg(); updateBkUi();
+  } catch (e) {
+    dialog('伴奏を読み込めませんでした', `「${file.name}」\nMP3・AAC(m4a)・WAV・AIFFのどれかに書き出してから読み込んでください。`, [{ label:'閉じる', primary:true }]);
+  }
+}
+function bkPlay() {
+  if (!bkBuf) return;
+  bkNodes(); bkStop();
+  if (ac.state !== 'running') ac.resume();
+  if (!bkWarned) { bkWarned = true; showMsg('伴奏はイヤホンで聴いてください。スピーカーから流すと、マイクに伴奏の音も入ってしまいます。'); }
+  const src = ac.createBufferSource(); src.buffer = bkBuf;
+  src.connect(bkOut); src.connect(bkDelay);
+  src.onended = () => { if (bkSrc === src) { bkSrc = null; updateBkUi(); } };
+  src.start(); bkSrc = src; bkStart = ac.currentTime;
+  updateBkUi();
+}
+function bkStop() {
+  if (bkSrc) { const src = bkSrc; bkSrc = null; try { src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} }
+  updateBkUi();
+}
+function updateBkUi() {
+  const pick = document.getElementById('bkName'); if (!pick) return;
+  pick.textContent = bkName || '未選択';
+  $('#bkPlay').disabled = !bkBuf || mode !== 'live';
+  $('#bkPlay').textContent = bkSrc ? '■ 伴奏を止める' : '▶ 伴奏を再生';
+  $('#bkBar').disabled = mode !== 'live';
+  $('#bkBar').textContent = bkSrc ? '■ 伴奏' : '♪ 伴奏';
+}
+function bkHud() {
+  const tm = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  return `♪ 伴奏:${bkName} ${tm(Math.max(0, ac.currentTime - bkStart))} / ${tm(bkBuf.duration)}`;
+}
+$('#bkPick').onclick = () => { ensureAudio(); $('#bkIn').click(); };
+$('#bkIn').onchange = e => { const f = e.target.files[0]; if (f) bkLoad(f); e.target.value = ''; };
+$('#bkPlay').onclick = () => bkSrc ? bkStop() : bkPlay();
+$('#bkBar').onclick = () => {
+  if (!bkBuf) {   // まだ曲がなければ、調整パネルを開いて曲を選んでもらう
+    if (!$('#tune').classList.contains('open')) $('#tuneBtn').click();
+    ensureAudio(); $('#bkIn').click(); return;
+  }
+  bkSrc ? bkStop() : bkPlay();
+};
+$('#bkVol').value = Math.round(bkVol * 100); $('#bkLat').value = bkLat;
+$('#bkVol').addEventListener('input', () => { bkVol = +$('#bkVol').value / 100; bkApply(); save(); });
+$('#bkLat').addEventListener('input', () => { bkLat = +$('#bkLat').value; bkApply(); save(); });
+bkApply();
 
 function updateUi(now) {
   for (const d of DRUMS) {
@@ -1062,13 +2087,16 @@ function updateUi(now) {
     $('#lvl').classList.toggle('clip', pk > .98);
     if (rec && pk > recPeak) recPeak = pk;
   }
-  if (rec) { const s = Math.floor((now - recStart) / 1000); $('#recTxt').textContent = `停止 ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
-  $('#hud').textContent = now < calibUntil ? '環境音を測っています。1.5秒ほど静かにしてください' : genre === 'fusion' && pitch.on ? `音程 ${pitch.name}(${Math.round(pitch.f)}Hz)→ ${pitch.n}角形` : '';
+  if (rec) { const s = Math.floor((now - recStart) / 1000), tm = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; $('#recTxt').textContent = `停止 ${tm}`; $('#recBadgeT').textContent = `REC ${tm}`; }
+  $('#hud').textContent = now < calibUntil ? '環境音を測っています。1.5秒ほど静かにしてください' : bkSrc ? bkHud() : (mode === 'audio' && audioName) ? audioHud() : genre === 'fusion' && pitch.on ? `音程 ${pitch.name}(${Math.round(pitch.f)}Hz)→ ${pitch.n}角形` : '';
 }
 
 // ---- 録画(合成後の映像 + マイク音声)----
 function startRec() {
   if (!window.MediaRecorder) { showMsg('このブラウザは録画に対応していません。Chrome か Edge を使ってください。'); return; }
+  if (genre === 'nature' && natResetOn) {   // 自然の演出を芽からやり直し、試し叩きのエフェクトも消す
+    resetNature(); fx.length = 0; ps.length = 0; shake = 0;
+  }
   const vs = cv.captureStream(30);
   const aTracks = recDest.stream.getAudioTracks();
   aTracks.forEach(t => t.enabled = true);
@@ -1106,13 +2134,16 @@ function startRec() {
       (btns.length > 2 ? '\niPhone・iPadでは「写真に保存・共有」→「ビデオを保存」で写真アプリに入ります。' : ''), btns);
   };
   rec.start(1000);
+  if (mode === 'live' && bkBuf && $('#bkAuto').checked) { bkAuto = true; setTimeout(() => { if (rec) bkPlay(); }, 500); }   // 録画が始まってから0.5秒後に伴奏
   recStart = performance.now();
-  $('#recBtn').classList.add('on');
+  $('#recBtn').classList.add('on'); document.body.classList.add('recording');
 }
 function stopRec() {
+  if (bkAuto) { bkAuto = false; bkStop(); }
   if (!rec) return;
   const r = rec; rec = null; r.stop();
   $('#recBtn').classList.remove('on'); $('#recTxt').textContent = '録画';
+  document.body.classList.remove('recording');
 }
 </script>
 </body>
