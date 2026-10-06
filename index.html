@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ドラム・ライブビジュアライザー</title>
-<meta name="version" content="2.1.5">
+<meta name="version" content="2.2.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -21,7 +21,7 @@ body{
   padding-top:env(safe-area-inset-top,0px);
 }
 #stage{position:relative;min-height:0;overflow:hidden;background:#000}
-#cv{position:relative;z-index:1;width:100%;height:100%;object-fit:contain;display:block}
+#cv{position:relative;z-index:1;width:100%;height:100%;object-fit:contain;display:block;touch-action:none}
 .srcvid{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0;pointer-events:none}
 
 /* 開始画面 */
@@ -137,7 +137,7 @@ body.ui-hidden #uiHint.show{opacity:1}
   <div id="hud"></div>
   <div id="flash"></div>
   <div id="recBadge" aria-hidden="true"><span class="dot"></span><span id="recBadgeT">REC</span></div>
-  <div id="uiHint">画面をタップするか、上へスワイプすると操作ボタンが出ます</div>
+  <div id="uiHint">画面をタップすると操作ボタンが出ます</div>
 
   <div id="intro">
     <div class="box">
@@ -193,7 +193,7 @@ body.ui-hidden #uiHint.show{opacity:1}
     <input type="range" id="gateIn" min="6" max="30" value="14" style="width:100%">
     <p class="note" style="margin-top:.4em">叩いていないのに光るときは右へ動かしてください。</p>
     <p style="margin-top:1.2em;display:flex;flex-wrap:wrap;gap:10px"><button class="btn" id="recal">環境音を測り直す</button><button class="btn" id="reset">初期値に戻す</button></p>
-    <p class="note" style="margin-top:1.4em">バージョン 2.1.5</p>
+    <p class="note" style="margin-top:1.4em">バージョン 2.2.0</p>
   </aside>
 </div>
 
@@ -201,6 +201,7 @@ body.ui-hidden #uiHint.show{opacity:1}
   <div class="strip" id="strip"></div>
   <div class="controls">
     <button class="btn" id="homeBtn" disabled>最初の画面へ</button>
+    <button class="btn" id="playBtn" hidden>❚❚ 一時停止</button>
     <div class="seg" role="group" aria-label="ジャンル">
       <button data-g="pop">ポップス</button>
       <button data-g="rock">ロック</button>
@@ -227,7 +228,7 @@ body.ui-hidden #uiHint.show{opacity:1}
 
 <script>
 'use strict';
-const APP_VERSION = '2.1.5';
+const APP_VERSION = '2.2.0';
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d');
 const PI2 = Math.PI * 2;
@@ -404,22 +405,32 @@ function showUI() {   // バーを出す。自動で隠す動きはやめた(隠
   document.body.classList.remove('ui-hidden');
 }
 // スワイプ:下へスワイプでバーを隠す、上へスワイプで出す(縦の動きがはっきりしているときだけ)
-let swY = null, swX = 0, swT = 0, swiped = false;
+const SWIPE_ENABLED = false;   // スワイプでの出し入れは使わない(タップで出し入れする)。戻すときは true にする
+let swY = null, swX = 0, swT = 0, swiped = false, swDone = false;
+const swipeBlocked = () => !mode || $('#tune').classList.contains('open') || !$('#dlg').hidden;   // 調整パネルや確認画面の中ではスワイプで出し入れしない
 window.addEventListener('touchstart', e => {
   if (e.touches.length !== 1) { swY = null; return; }
-  swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = performance.now(); swiped = false;
+  swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = performance.now(); swiped = false; swDone = false;
 }, { passive:true, capture:true });
-window.addEventListener('touchend', e => {
-  if (swY === null || !mode) return;
-  const t = e.changedTouches[0], dy = t.clientY - swY, dx = t.clientX - swX;
-  swY = null;
-  if (performance.now() - swT > 800 || Math.abs(dy) < 40 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
-  if ($('#tune').classList.contains('open') || !$('#dlg').hidden) return;   // 調整パネルの中のスクロールでは反応しない
-  swiped = true;
+// 指を動かしている途中で判定し、その場ですぐ隠す/出す(指を離すのを待たない)
+window.addEventListener('touchmove', e => {
+  if (!SWIPE_ENABLED || swY === null || swipeBlocked()) return;
+  const t = e.touches[0], dy = t.clientY - swY, dx = t.clientX - swX;
+  // 映像の上でのスワイプは、ブラウザのスクロールや戻る操作に取られないようにする
+  if (!e.target.closest('.controls') && e.cancelable) e.preventDefault();
+  if (swDone || Math.abs(dy) < 30 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+  swDone = true; swiped = true;
   if (dy > 0) hideUI(); else showUI();
-}, { passive:true, capture:true });
-window.addEventListener('pointerdown', () => { tapRevealed = document.body.classList.contains('ui-hidden'); showUI(); }, true);
-['pointermove', 'keydown', 'wheel'].forEach(ev => window.addEventListener(ev, showUI, { passive:true, capture:true }));
+}, { passive:false, capture:true });
+window.addEventListener('touchend', () => { swY = null; }, { passive:true, capture:true });
+window.addEventListener('touchcancel', () => { swY = null; }, { passive:true, capture:true });
+window.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return;   // タッチでは、触れただけでバーを出さない(スワイプやタップで判断する)
+  tapRevealed = document.body.classList.contains('ui-hidden'); showUI();
+}, true);
+// マウスを動かしたらバーを出す。タッチの指の動き(スワイプ)ではバーを出さない
+window.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showUI(); }, { passive:true, capture:true });
+['keydown', 'wheel'].forEach(ev => window.addEventListener(ev, showUI, { passive:true, capture:true }));
 
 // 操作バーの高さを測り、初期画面や調整パネルの下に同じだけ余白を作る
 const barEl = document.querySelector('.bar');
@@ -453,13 +464,28 @@ if (fsReq && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
   document.addEventListener('fullscreenchange', upd); document.addEventListener('webkitfullscreenchange', upd);
 }
 
+// 映像のタップ:どのモードでも、操作バーの出し入れだけをする(再生・一時停止は専用ボタンで)
 $('#stage').addEventListener('click', e => {
   if (swiped) { swiped = false; tapRevealed = false; return; }
-  if (tapRevealed) { tapRevealed = false; return; }   // 隠れていたバーを出すためのタップでは一時停止しない
-  if (mode === 'live' && (e.target === cv || e.target.id === 'stage')) { hideUI(); return; }   // 撮影中は、画面をタップするとすぐバーを隠す
-  if (mode === 'file' && e.target === cv && video) video.paused ? video.play() : video.pause();
-  if (mode === 'audio' && e.target === cv && audioEl) audioEl.paused ? audioEl.play() : audioEl.pause();
+  if (tapRevealed) { tapRevealed = false; return; }   // マウスで隠れたバーを出したクリックは、そこで終わり
+  if (!mode || !(e.target === cv || e.target.id === 'stage')) return;
+  document.body.classList.contains('ui-hidden') ? showUI() : hideUI();
 });
+
+// ---- 再生・一時停止(動画ファイル・音声ファイル)----
+function mediaEl() { return mode === 'file' ? video : mode === 'audio' ? audioEl : null; }
+function togglePlay() {
+  const m = mediaEl(); if (!m) return;
+  if (ac && ac.state !== 'running') ac.resume();
+  m.paused ? m.play().catch(() => {}) : m.pause();
+}
+function updatePlayBtn() {
+  const m = mediaEl(), b = $('#playBtn');
+  b.hidden = !m;
+  if (m) b.textContent = m.paused ? '▶ 再生' : '❚❚ 一時停止';
+}
+$('#playBtn').onclick = togglePlay;
+
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.repeat) return;
@@ -472,6 +498,7 @@ document.addEventListener('keydown', e => {
   if (k === '4') setGenre('yokai', true);
   if (k === '5') setGenre('nature', true);
   if (k === 'r' && !$('#recBtn').disabled) $('#recBtn').click();
+  if (k === ' ' && mediaEl()) { e.preventDefault(); togglePlay(); }   // スペースキーで再生・一時停止
 });
 
 // カメラ・マイクが許可されていないときの案内(ボタン付き)
@@ -659,7 +686,7 @@ function attachFile(v, file, alreadyPlaying) {
   srcNode.connect(inputNode); srcNode.connect(recDest); srcNode.connect(ac.destination);
   mode = 'file'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false);
   $('#flipBtn').disabled = true;
-  onStarted('動画ファイル(画面クリックで一時停止)');
+  onStarted('動画ファイル');
   if (!alreadyPlaying) {
     const p = v.play();
     if (p && p.catch) p.catch(() => {   // iPhone/iPadは音付き動画の自動再生を止めるので、タップで再生してもらう
@@ -769,7 +796,7 @@ async function startAudio(file) {
   srcNode = ac.createMediaElementSource(a);
   srcNode.connect(inputNode); srcNode.connect(recDest); srcNode.connect(ac.destination);
   video = null; mode = 'audio'; mirror = false; $('#mirBtn').setAttribute('aria-pressed', false); $('#flipBtn').disabled = true;
-  onStarted('音声ファイル(画面クリックで一時停止)');
+  onStarted('音声ファイル');
   dialog('音声ファイルを選びました', file.name + '\n再生に合わせて、音を聴き分けてエフェクトを出します。録画すると、エフェクトの映像と音がいっしょに保存されます。', [
     { label:'再生してスタート', primary:true, onClick:() => {
       if (ac.state !== 'running') ac.resume();
@@ -2115,6 +2142,7 @@ $('#bkLat').addEventListener('input', () => { bkLat = +$('#bkLat').value; bkAppl
 bkApply();
 
 function updateUi(now) {
+  updatePlayBtn();
   for (const d of DRUMS) {
     const s = st[d.id], lit = now - s.lamp < 130;
     rows[d.id].bar.style.transform = `scaleX(${s.above > gateDb ? clamp(s.rise / (thrOf(d) * 2), 0, 1) : 0})`;
