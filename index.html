@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ドラム・ライブビジュアライザー</title>
-<meta name="version" content="2.2.0">
+<meta name="version" content="2.2.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -13,6 +13,7 @@
   --kick:#ff3b30; --snare:#3d8bff; --hihat:#ffffff; --htom:#2ee87a; --ltom:#ffe11a; --ftom:#a35bff; --crash:#ffb31a; --ride:#5fd8ff;
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}   /* hidden の指定を、ボタンの表示指定より優先する */
 html,body{height:100%;margin:0}
 body{
   background:var(--stage);color:var(--ink);
@@ -193,7 +194,7 @@ body.ui-hidden #uiHint.show{opacity:1}
     <input type="range" id="gateIn" min="6" max="30" value="14" style="width:100%">
     <p class="note" style="margin-top:.4em">叩いていないのに光るときは右へ動かしてください。</p>
     <p style="margin-top:1.2em;display:flex;flex-wrap:wrap;gap:10px"><button class="btn" id="recal">環境音を測り直す</button><button class="btn" id="reset">初期値に戻す</button></p>
-    <p class="note" style="margin-top:1.4em">バージョン 2.2.0</p>
+    <p class="note" style="margin-top:1.4em">バージョン 2.2.1</p>
   </aside>
 </div>
 
@@ -228,7 +229,7 @@ body.ui-hidden #uiHint.show{opacity:1}
 
 <script>
 'use strict';
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.2.1';
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d');
 const PI2 = Math.PI * 2;
